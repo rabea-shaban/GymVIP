@@ -1,0 +1,94 @@
+/* ==========================================================================
+   GymVIP Typography Scale & Utilities
+   ========================================================================== */
+
+.font-display,
+.font-cairo {
+  font-family: 'Cairo', sans-serif;
+}
+
+.font-body,
+.font-ibm {
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif;
+}
+
+/* Typography Scale Classes */
+.text-display-lg {
+  font-family: 'Cairo', sans-serif;
+  font-size: 2.5rem; /* 40px */
+  font-weight: 800;
+  line-height: 3.25rem; /* 52px */
+  letter-spacing: -0.02em;
+}
+
+.text-headline-xl {
+  font-family: 'Cairo', sans-serif;
+  font-size: 2rem; /* 32px */
+  font-weight: 700;
+  line-height: 2.75rem; /* 44px */
+  letter-spacing: -0.015em;
+}
+
+.text-headline-lg {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.625rem; /* 26px */
+  font-weight: 700;
+  line-height: 2.25rem; /* 36px */
+}
+
+.text-headline-md {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.375rem; /* 22px */
+  font-weight: 600;
+  line-height: 1.875rem; /* 30px */
+}
+
+.text-headline-sm {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.125rem; /* 18px */
+  font-weight: 600;
+  line-height: 1.625rem; /* 26px */
+}
+
+.text-title-sm {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1rem; /* 16px */
+  font-weight: 600;
+  line-height: 1.5rem; /* 24px */
+}
+
+.text-body-lg {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 1rem; /* 16px */
+  font-weight: 400;
+  line-height: 1.625rem; /* 26px */
+}
+
+.text-body-md {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 400;
+  line-height: 1.5rem; /* 24px */
+}
+
+.text-body-sm {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 400;
+  line-height: 1.25rem; /* 20px */
+}
+
+.text-caption {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 0.75rem; /* 12px */
+  font-weight: 400;
+  line-height: 1.125rem; /* 18px */
+}
+
+.text-tabular-stat {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.75rem; /* 28px */
+  font-weight: 700;
+  line-height: 2.25rem; /* 36px */
+  font-variant-numeric: tabular-nums;
+}
