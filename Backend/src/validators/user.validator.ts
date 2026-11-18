@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { Role } from '@prisma/client'
+import { normalizeEgyptianPhone } from './member.validator.js'
 
-const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+const EGYPTIAN_PHONE_REGEX = /^01[0125][0-9]{8}$/
 
 export const createUserSchema = z.object({
   name: z
@@ -15,15 +16,23 @@ export const createUserSchema = z.object({
     .email('صيغة البريد الإلكتروني غير صحيحة / Invalid email format')
     .toLowerCase(),
   phone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    )
+    .any()
     .optional()
     .nullable()
-    .or(z.literal('')),
+    .transform((val) => {
+      if (!val || String(val).trim() === '') return null
+      return normalizeEgyptianPhone(val)
+    })
+    .pipe(
+      z
+        .string()
+        .regex(
+          EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+        )
+        .nullable()
+        .optional()
+    ),
   role: z.nativeEnum(Role, {
     errorMap: (issue) => {
       if (issue.code === 'invalid_type') {
@@ -39,6 +48,7 @@ export const createUserSchema = z.object({
       /^(?=.*[a-zA-Z])(?=.*[0-9])/,
       'يجب أن تحتوي كلمة المرور على أحرف وأرقام معاً / Password must contain both letters and numbers'
     ),
+  avatarUrl: z.string().optional().nullable().or(z.literal('')),
 })
 
 export const updateUserSchema = z.object({
@@ -49,15 +59,24 @@ export const updateUserSchema = z.object({
     .max(100, 'الاسم طويل جداً')
     .optional(),
   phone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    )
+    .any()
     .optional()
     .nullable()
-    .or(z.literal('')),
+    .transform((val) => {
+      if (!val || String(val).trim() === '') return null
+      return normalizeEgyptianPhone(val)
+    })
+    .pipe(
+      z
+        .string()
+        .regex(
+          EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+        )
+        .nullable()
+        .optional()
+    ),
+  avatarUrl: z.string().optional().nullable().or(z.literal('')),
   role: z.nativeEnum(Role).optional(),
 })
 

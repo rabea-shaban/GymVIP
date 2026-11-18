@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getMediaUrl } from '@/lib/media'
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
@@ -22,6 +23,10 @@ export const Avatar: React.FC<AvatarProps> = ({
   ...props
 }) => {
   const [hasError, setHasError] = useState(false)
+
+  React.useEffect(() => {
+    setHasError(false)
+  }, [src])
 
   const sizes: Record<AvatarSize, string> = {
     xs: 'w-6 h-6 text-[10px]',
@@ -53,6 +58,8 @@ export const Avatar: React.FC<AvatarProps> = ({
     return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase()
   }
 
+  const resolvedSrc = getMediaUrl(src)
+
   return (
     <div className="relative inline-flex shrink-0 select-none">
       <div
@@ -63,9 +70,9 @@ export const Avatar: React.FC<AvatarProps> = ({
         )}
         {...props}
       >
-        {src && !hasError ? (
+        {resolvedSrc && !hasError ? (
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt || name || 'صورة المستخدم'}
             onError={() => setHasError(true)}
             className="w-full h-full object-cover"

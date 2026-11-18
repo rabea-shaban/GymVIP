@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils'
 import { useToast } from '@/components/feedback/Toast'
 import { plansApi } from '@/features/plans/services/plansApi'
 import type { PlanItem } from '@/features/plans/types/plan.types'
+import { validateName, extractBackendErrors } from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
 
 export const PlanEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +32,7 @@ export const PlanEditPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false)
+  const [planErrors, setPlanErrors] = useState<Record<string, string>>({})
 
   // Modals state
   const [showDisableModal, setShowDisableModal] = useState(false)
@@ -90,11 +92,66 @@ export const PlanEditPage: React.FC = () => {
     fetchPlan()
   }, [id])
 
+  const handlePlanNameChange = (val: string) => {
+    setPlanName(val)
+    if (!val.trim()) {
+      setPlanErrors((prev) => ({ ...prev, name: 'اسم الخطة مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم الخطة', 2, 100)
+      setPlanErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handlePriceChange = (val: number) => {
+    setPrice(val)
+    let err = ''
+    if (val < 0) {
+      err = 'سعر الاشتراك لا يمكن أن يكون سالباً'
+    } else if (val > 1000000) {
+      err = 'سعر الاشتراك يتجاوز الحد الأقصى المسموح به'
+    }
+    setPlanErrors((prev) => ({ ...prev, price: err }))
+  }
+
+  const handleDurationChange = (val: number, unit = durationUnit) => {
+    setDurationValue(val)
+    let days = val
+    if (unit === 'MONTHS') days = val * 30
+    else if (unit === 'YEARS') days = val * 365
+    let err = ''
+    if (days < 1) {
+      err = 'مدة الاشتراك يجب أن تكون يوماً واحداً على الأقل'
+    } else if (days > 3650) {
+      err = 'مدة الاشتراك يجب ألا تتجاوز 10 سنوات'
+    }
+    setPlanErrors((prev) => ({ ...prev, durationDays: err }))
+  }
+
   // Save changes
   const handleSave = async () => {
-    setHasAttemptedSubmit(true)
-    if (!planName.trim() || price === undefined || price < 0) {
-      toast.error('يرجى ملء جميع الحقول الإلزامية المطلوبة (اسم الخطة وسعر الاشتراك)')
+    const errs: Record<string, string> = {}
+    const nameRes = validateName(planName, 'اسم الخطة', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    if (totalDays < 1) {
+      errs.durationDays = 'مدة الاشتراك يجب أن تكون يوماً واحداً على الأقل'
+    } else if (totalDays > 3650) {
+      errs.durationDays = 'مدة الاشتراك يجب ألا تتجاوز 10 سنوات'
+    }
+
+    if (price === undefined || price === null || price < 0) {
+      errs.price = 'سعر الاشتراك لا يمكن أن يكون سالباً'
+    } else if (price > 1000000) {
+      errs.price = 'سعر الاشتراك يتجاوز الحد الأقصى المسموح به'
+    }
+
+    if (description.trim().length > 500) {
+      errs.description = 'الوصف طويل جداً (الحد الأقصى 500 حرف)'
+    }
+
+    setPlanErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs)[0])
       return
     }
 
@@ -112,8 +169,11 @@ export const PlanEditPage: React.FC = () => {
         navigate('/app/plans')
       }, 500)
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'فشل تحديث الباقة'
-      toast.error(msg)
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setPlanErrors(backendErrors)
+      }
+      toast.error(generalMessage || 'فشل تحديث الباقة')
     } finally {
       setIsSaving(false)
     }
@@ -173,8 +233,8 @@ export const PlanEditPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-zinc-950 text-gym-gold flex items-center justify-center shrink-0 shadow-xs">
-              <Edit3 className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Edit3 className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-zinc-950">تعديل خطة الاشتراك</h1>
             <span className="text-[11px] font-mono font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-lg">
@@ -283,19 +343,17 @@ export const PlanEditPage: React.FC = () => {
                   <input
                     type="text"
                     value={planName}
-                    onChange={(e) => setPlanName(e.target.value)}
+                    onChange={(e) => handlePlanNameChange(e.target.value)}
                     placeholder="مثال: الاشتراك الشهري"
                     className={cn(
                       'w-full px-4 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-bold',
-                      hasAttemptedSubmit && !planName
+                      planErrors.name
                         ? 'border-rose-400 bg-rose-50/50 text-rose-900'
                         : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                     )}
                   />
                 </div>
-                {hasAttemptedSubmit && !planName && (
-                  <p className="text-[11px] text-rose-600 font-bold mt-1">حقل اسم الخطة مطلوب</p>
-                )}
+                <FieldError error={planErrors.name} />
               </div>
 
               {/* Field Grid: Price (Right in RTL) & Duration (Left in RTL) */}
@@ -312,10 +370,10 @@ export const PlanEditPage: React.FC = () => {
                       type="number"
                       min="0"
                       value={price}
-                      onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                      onChange={(e) => handlePriceChange(Number(e.target.value) || 0)}
                       className={cn(
                         'w-full pr-4 pl-16 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-mono font-black text-lg',
-                        hasAttemptedSubmit && (!price || price < 0)
+                        planErrors.price
                           ? 'border-rose-400 bg-rose-50/50 text-rose-900'
                           : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                       )}
@@ -324,6 +382,7 @@ export const PlanEditPage: React.FC = () => {
                       ج.م
                     </span>
                   </div>
+                  <FieldError error={planErrors.price} />
                   <p className="text-[10px] text-zinc-400 mt-1">السعر الصافي شامل صلاحية الصالة</p>
                 </div>
 
@@ -340,13 +399,20 @@ export const PlanEditPage: React.FC = () => {
                         type="number"
                         min="1"
                         value={durationValue}
-                        onChange={(e) => setDurationValue(Number(e.target.value) || 0)}
-                        className="w-full px-4 py-2.5 text-xs sm:text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:border-zinc-900 focus:outline-none transition-all font-mono font-bold"
+                        onChange={(e) => handleDurationChange(Number(e.target.value) || 0)}
+                        className={cn(
+                          'w-full px-4 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:border-zinc-900 focus:outline-none transition-all font-mono font-bold',
+                          planErrors.durationDays ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                        )}
                       />
                     </div>
                     <select
                       value={durationUnit}
-                      onChange={(e) => setDurationUnit(e.target.value as any)}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as any
+                        setDurationUnit(newUnit)
+                        handleDurationChange(durationValue, newUnit)
+                      }}
                       className="w-24 px-3 py-2.5 text-xs bg-zinc-50 border border-zinc-200 rounded-xl font-bold cursor-pointer"
                     >
                       <option value="DAYS">أيام</option>
@@ -354,6 +420,7 @@ export const PlanEditPage: React.FC = () => {
                       <option value="YEARS">سنوات</option>
                     </select>
                   </div>
+                  <FieldError error={planErrors.durationDays} />
                   <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-1">
                     <span>الحد الأدنى: 1 يوم</span>
                     <span className="font-mono text-zinc-500">يعادل {totalDays} يوماً فعلياً في النظام</span>

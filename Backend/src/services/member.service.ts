@@ -13,6 +13,8 @@ import type {
 } from '../validators/member.validator.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
+import { saveBase64Image, deleteStoredImage } from '../utils/fileStorage.util.js'
 
 /**
  * Formats a raw Prisma Member record into a clean, safe DTO
@@ -96,6 +98,11 @@ export async function createMember(
     attempts++
     const memberCode = await generateMemberCode(gymId)
 
+    // Save avatar to disk if provided as base64
+    const savedAvatarUrl = input.avatarUrl
+      ? await saveBase64Image(input.avatarUrl, 'members', `member-${memberCode}`)
+      : null
+
     try {
       const member = await prisma.member.create({
         data: {
@@ -110,7 +117,7 @@ export async function createMember(
           emergencyContactName: input.emergencyContactName ?? null,
           emergencyContactPhone: input.emergencyContactPhone ?? null,
           notes: input.notes ?? null,
-          avatarUrl: input.avatarUrl ?? null,
+          avatarUrl: savedAvatarUrl,
           isActive: true,
         },
       })
@@ -125,6 +132,12 @@ export async function createMember(
         entityId: member.id,
         description: `تم تسجيل عضو جديد (${member.name}) بكود (${member.memberCode})`,
         afterData: dto,
+      })
+
+      // Emit real-time event across the gym
+      emitGymEvent(gymId, REALTIME_EVENTS.MEMBER_CREATED, {
+        member: dto,
+        memberId: member.id,
       })
 
       return dto
@@ -348,7 +361,25 @@ export async function updateMember(
     updateData.emergencyContactPhone = input.emergencyContactPhone ?? null
   }
   if (input.notes !== undefined) updateData.notes = input.notes ?? null
-  if (input.avatarUrl !== undefined) updateData.avatarUrl = input.avatarUrl ?? null
+
+  if (input.avatarUrl !== undefined) {
+    if (input.avatarUrl) {
+      const saved = await saveBase64Image(input.avatarUrl, 'members', `member-${existingMember.memberCode}`)
+      updateData.avatarUrl = saved
+      if (
+        existingMember.avatarUrl &&
+        existingMember.avatarUrl !== saved &&
+        existingMember.avatarUrl.startsWith('/uploads/')
+      ) {
+        await deleteStoredImage(existingMember.avatarUrl)
+      }
+    } else {
+      updateData.avatarUrl = null
+      if (existingMember.avatarUrl?.startsWith('/uploads/')) {
+        await deleteStoredImage(existingMember.avatarUrl)
+      }
+    }
+  }
 
   const updatedMember = await prisma.member.update({
     where: { id: memberId },
@@ -366,6 +397,12 @@ export async function updateMember(
     description: `تم تعديل بيانات العضو (${updatedMember.name})`,
     beforeData: formatMemberDto(existingMember),
     afterData: dto,
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.MEMBER_UPDATED, {
+    member: dto,
+    memberId: updatedMember.id,
   })
 
   return dto
@@ -411,6 +448,12 @@ export async function updateMemberStatus(
       : `تم تعطيل حساب العضو (${updatedMember.name})`,
     beforeData: { isActive: existingMember.isActive },
     afterData: { isActive: updatedMember.isActive },
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.MEMBER_UPDATED, {
+    member: dto,
+    memberId: updatedMember.id,
   })
 
   return dto

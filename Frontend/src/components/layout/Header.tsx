@@ -18,6 +18,7 @@ import { QuickActionsMenu } from './QuickActionsMenu'
 import { GlobalSearchModal } from './GlobalSearchModal'
 import { useQuery } from '@tanstack/react-query'
 import { notificationsApi } from '@/features/notifications/services/notificationsApi'
+import { useSocketStatus } from '@/services/socket'
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const isRealtimeConnected = useSocketStatus()
 
   const { data: unreadData } = useQuery({
     queryKey: ['notifications', 'unread-count'],
@@ -99,6 +101,23 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
 
         {/* Right Side (RTL End): Quick Actions + Notifications + User Menu */}
         <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Live Real-time Sync Indicator */}
+          <div
+            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-50 border border-zinc-200/80 text-[11px] font-bold text-zinc-600 select-none shadow-2xs"
+            title={isRealtimeConnected ? 'متصل لحظياً عبر WebSocket - التحديث فوري بدون ريفرش' : 'جاري إعادة الاتصال...'}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRealtimeConnected
+                  ? 'bg-emerald-500 animate-pulse ring-2 ring-emerald-200'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-[10px] text-zinc-600 font-bold">
+              {isRealtimeConnected ? 'تحديث لحظي نشط' : 'جاري الاتصال'}
+            </span>
+          </div>
+
           {/* Quick Actions Dropdown */}
           <QuickActionsMenu />
 

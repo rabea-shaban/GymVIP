@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Calendar,
   Search,
@@ -22,7 +24,11 @@ import { cn } from '@/lib/utils'
 import { useToast } from '@/components/feedback/Toast'
 import { attendanceApi } from '../services/attendanceApi'
 import { membersApi } from '@/features/members/services/membersApi'
+import { useRealtimeSync } from '@/services/socket'
 import { ExportDropdown } from '@/components/ui/ExportDropdown'
+import { useAuth } from '@/features/auth/context/AuthContext'
+import { Avatar } from '@/components/ui/Avatar'
+import { getMediaUrl } from '@/lib/media'
 import type { AttendanceItem } from '../types/attendance.types'
 
 interface LiveAttendee {
@@ -30,6 +36,7 @@ interface LiveAttendee {
   name: string
   avatarLetters: string
   avatarBg: string
+  avatarUrl?: string | null
   code: string
   phone: string
   checkInTime: string
@@ -45,6 +52,14 @@ interface LiveAttendee {
 export const AttendancePage: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
+  const queryClient = useQueryClient()
+  const { user, gym } = useAuth()
+
+  React.useEffect(() => {
+    if (user?.role === 'TRAINER') {
+      navigate('/app/trainer/attendance', { replace: true })
+    }
+  }, [user, navigate])
 
   // Live Turnstile Gate State
   const [isTurnstileOpen, setIsTurnstileOpen] = useState(false)
@@ -122,6 +137,7 @@ export const AttendancePage: React.FC = () => {
       name: att.member?.name || 'عضو متدرب',
       avatarLetters,
       avatarBg: 'bg-zinc-950 text-white',
+      avatarUrl: att.member?.avatarUrl ?? null,
       code: att.member?.memberCode || 'GYM-00000',
       phone: att.member?.phone || '',
       checkInTime,
@@ -161,6 +177,11 @@ export const AttendancePage: React.FC = () => {
   React.useEffect(() => {
     loadAttendanceData()
   }, [loadAttendanceData])
+
+  // Instant Real-Time WebSocket sync for Turnstile Desk
+  useRealtimeSync(undefined, () => {
+    loadAttendanceData()
+  })
 
   // Handle Search Member for Scanner Preview
   const handleSearchMember = async (queryText?: string) => {
@@ -258,6 +279,7 @@ export const AttendancePage: React.FC = () => {
     if (targetId) {
       try {
         await attendanceApi.checkIn(targetId)
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         setIsTurnstileOpen(true)
         toast.success(`تم تسجيل دخول ${previewMember.name} وفتح البوابة بنجاح!`)
         setPreviewMember((prev) => (prev ? { ...prev, checkedInToday: true } : null))
@@ -285,6 +307,7 @@ export const AttendancePage: React.FC = () => {
     if (selectedAttendee) {
       try {
         await attendanceApi.checkOut(selectedAttendee.id)
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         toast.success(
           `تم تسجيل خروج العضو ${selectedAttendee.name} بنجاح. مدة التمرين: ${selectedAttendee.durationFormatted}`
         )
@@ -435,8 +458,8 @@ export const AttendancePage: React.FC = () => {
         <div className="lg:col-span-8 bg-white rounded-3xl border border-zinc-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-zinc-950 text-gym-gold flex items-center justify-center font-black text-xs">
-                <QrCode className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-xs">
+                <QrCode className="w-4 h-4 text-white" />
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black text-zinc-950">
@@ -504,13 +527,13 @@ export const AttendancePage: React.FC = () => {
                 <div className="relative shrink-0">
                   <div className="w-14 h-14 rounded-2xl bg-zinc-950 text-white flex items-center justify-center font-black text-lg border border-zinc-800 overflow-hidden">
                     {previewMember.avatarUrl ? (
-                      <img src={previewMember.avatarUrl} alt={previewMember.name} className="w-full h-full object-cover" />
+                      <img src={getMediaUrl(previewMember.avatarUrl)} alt={previewMember.name} className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-7 h-7 text-gym-gold" />
                     )}
                   </div>
                   {previewMember.isVip && (
-                    <span className="absolute -bottom-1.5 -right-1.5 bg-zinc-950 text-gym-gold text-[9px] font-black px-1.5 py-0.5 rounded border border-gym-gold/40">
+                    <span className="absolute -bottom-1.5 -right-1.5 bg-zinc-950 text-white text-[9px] font-black px-1.5 py-0.5 rounded border border-zinc-700">
                       VIP
                     </span>
                   )}
@@ -756,15 +779,13 @@ export const AttendancePage: React.FC = () => {
                   <tr key={item.id} className="hover:bg-zinc-50/70 transition-colors">
                     {/* 1. Member */}
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={cn(
-                            'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0',
-                            item.avatarBg
-                          )}
-                        >
-                          {item.avatarLetters}
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={item.avatarUrl || undefined}
+                          name={item.name}
+                          size="sm"
+                          className="border border-zinc-200 shadow-2xs shrink-0 ring-1 ring-zinc-100"
+                        />
                         <div>
                           <div className="font-bold text-zinc-950 flex items-center gap-1.5">
                             <span>{item.name}</span>
@@ -816,13 +837,19 @@ export const AttendancePage: React.FC = () => {
 
                     {/* 6. Checkout Button */}
                     <td className="py-3.5 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleCheckOutAttendee(item)}
-                        className="px-3.5 py-1.5 rounded-xl border border-zinc-200 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-100 transition-colors shadow-2xs"
-                      >
-                        تسجيل الخروج
-                      </button>
+                      {gym?.allowManualCheckout === false ? (
+                        <span className="text-[11px] font-semibold text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded-lg">
+                          إغلاق تلقائي
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleCheckOutAttendee(item)}
+                          className="px-3.5 py-1.5 rounded-xl border border-zinc-200 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-100 transition-colors shadow-2xs"
+                        >
+                          تسجيل الخروج
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -868,8 +895,8 @@ export const AttendancePage: React.FC = () => {
       </div>
 
       {/* MODAL 1: Check-out Confirmation Modal */}
-      {showCheckoutModal && selectedAttendee && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      {showCheckoutModal && selectedAttendee && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-zinc-100 animate-in fade-in zoom-in-95 duration-150 space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto">
               <LogOut className="w-6 h-6" />
@@ -912,12 +939,13 @@ export const AttendancePage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL 2: Manual Check-in Modal */}
-      {showManualCheckInModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      {showManualCheckInModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-zinc-100 animate-in fade-in zoom-in-95 duration-150 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
               <h3 className="text-base font-black text-zinc-950">تسجيل حضور يدوي</h3>
@@ -1006,6 +1034,7 @@ export const AttendancePage: React.FC = () => {
                   if (manualFoundMember) {
                     try {
                       await attendanceApi.checkIn(manualFoundMember.id)
+                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
                       toast.success(`تم تسجيل حضور ${manualFoundMember.name} بنجاح!`)
                       setShowManualCheckInModal(false)
                       setManualQuery('')
@@ -1035,7 +1064,8 @@ export const AttendancePage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

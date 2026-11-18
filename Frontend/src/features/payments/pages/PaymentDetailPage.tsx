@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { paymentsApi } from '../services/paymentsApi'
 import type { PaymentItem, PaymentSummary } from '../types/payment.types'
+import { useRealtimeSync } from '@/services/socket'
 
 export const PaymentDetailPage: React.FC = () => {
   const navigate = useNavigate()
@@ -86,6 +87,11 @@ export const PaymentDetailPage: React.FC = () => {
     loadPaymentData()
   }, [loadPaymentData])
 
+  // Instant Real-Time WebSocket updates for Payment Details
+  useRealtimeSync(undefined, () => {
+    loadPaymentData()
+  })
+
   // Computed data
   const isCash = realPayment?.method === 'CASH'
   const currentPaymentId = realPayment?.id || paymentId
@@ -97,7 +103,7 @@ export const PaymentDetailPage: React.FC = () => {
     : 'نقدي (كاش)'
   const referenceNo = realPayment?.transactionReference || '—'
   const paymentDate = realPayment
-    ? new Date(realPayment.createdAt).toLocaleString('ar-EG', {
+    ? new Date(realPayment.createdAt).toLocaleString('ar-EG-u-nu-latn', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -611,8 +617,12 @@ export const PaymentDetailPage: React.FC = () => {
             <div className="bg-[#FAF9F5] border-2 border-dashed border-zinc-300 rounded-2xl p-5 text-center space-y-4 text-xs font-mono shadow-inner relative">
               {/* Gym Header */}
               <div className="space-y-1">
-                <div className="w-10 h-10 rounded-xl bg-zinc-950 text-white flex items-center justify-center mx-auto mb-1">
-                  <Building className="w-5 h-5 text-[#F5D86B]" />
+                <div className="w-12 h-12 rounded-xl bg-zinc-950 text-white flex items-center justify-center mx-auto mb-1 overflow-hidden">
+                  {realPayment?.gym?.logo ? (
+                    <img src={realPayment.gym.logo} alt={realPayment.gym.name} className="w-full h-full object-contain" />
+                  ) : (
+                    <Building className="w-5 h-5 text-[#F5D86B]" />
+                  )}
                 </div>
                 <div className="font-black text-zinc-950 text-sm font-cairo tracking-wide">
                   {realPayment?.gym?.name || 'GymVIP Fitness'}
@@ -673,7 +683,7 @@ export const PaymentDetailPage: React.FC = () => {
 
               <div className="text-[10px] text-zinc-500 space-y-0.5 font-cairo pt-1">
                 <div>الموظف المسؤول: {staffName}</div>
-                <div className="font-bold text-zinc-900">شكراً لاختياركم GymVIP</div>
+                <div className="font-bold text-zinc-900">شكراً لاختياركم {realPayment?.gym?.name || 'GymVIP'}</div>
                 <div className="text-[9px] text-zinc-400">إيصال تحصيل رسمي موثق إلكترونياً</div>
               </div>
             </div>

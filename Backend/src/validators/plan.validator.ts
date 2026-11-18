@@ -13,15 +13,15 @@ export const createPlanSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal('')),
-  durationDays: z
+  durationDays: z.coerce
     .number({ required_error: 'مدة الباقة بالأيام مطلوبة / Duration in days is required' })
     .int('يجب أن تكون المدة عدداً صحيحاً من الأيام / Duration must be an integer')
     .min(1, 'مدة الباقة يجب أن تكون يوماً واحداً على الأقل / Duration must be at least 1 day')
     .max(3650, 'مدة الباقة يجب ألا تتجاوز 3650 يوماً (10 سنوات)'),
-  price: z
+  price: z.coerce
     .number({ required_error: 'سعر الباقة مطلوب / Price is required' })
     .min(0, 'سعر الباقة لا يمكن أن يكون سالباً / Price cannot be negative')
-    .max(1000000, 'سعر الباقة يتجاوز الحد الأقصى المسموح')
+    .max(1000000, 'سعر الباقة يتجاوز الحد الأقصى المسموح (مليون جنيه)')
     .refine(
       (val) => {
         const decimals = (val.toString().split('.')[1] || '').length
@@ -45,13 +45,13 @@ export const updatePlanSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal('')),
-  durationDays: z
+  durationDays: z.coerce
     .number()
     .int('يجب أن تكون المدة عدداً صحيحاً من الأيام')
     .min(1, 'مدة الباقة يجب أن تكون يوماً واحداً على الأقل')
     .max(3650, 'مدة الباقة يجب ألا تتجاوز 3650 يوماً')
     .optional(),
-  price: z
+  price: z.coerce
     .number()
     .min(0, 'سعر الباقة لا يمكن أن يكون سالباً')
     .max(1000000, 'سعر الباقة يتجاوز الحد الأقصى المسموح')

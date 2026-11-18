@@ -2,6 +2,7 @@ import React from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { UserRole } from '@/types'
+import { UnauthorizedPage } from '@/pages/errors/UnauthorizedPage'
 
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[]
@@ -25,7 +26,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/403" replace />
+    return (
+      <UnauthorizedPage
+        attemptedPath={location.pathname}
+        allowedRoles={allowedRoles}
+        standalone={!location.pathname.startsWith('/app')}
+      />
+    )
   }
 
   return children ? <>{children}</> : <Outlet />

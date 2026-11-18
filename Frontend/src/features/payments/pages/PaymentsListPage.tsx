@@ -21,8 +21,10 @@ import {
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/feedback/Toast'
 import { ExportDropdown } from '@/components/ui/ExportDropdown'
+import { useAuth } from '@/features/auth/context/AuthContext'
 import { paymentsApi } from '../services/paymentsApi'
 import type { PaymentMethod } from '../types/payment.types'
+import { useRealtimeSync } from '@/services/socket'
 
 interface PaymentTransaction {
   id: string
@@ -50,6 +52,7 @@ interface PaymentTransaction {
 export const PaymentsListPage: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
+  const { gym } = useAuth()
 
   // Modals & Selected Item
   const [selectedTransaction, setSelectedTransaction] = useState<PaymentTransaction | null>(null)
@@ -129,6 +132,11 @@ export const PaymentsListPage: React.FC = () => {
   React.useEffect(() => {
     loadPayments()
   }, [loadPayments])
+
+  // Instant Real-Time WebSocket updates for Payments List
+  useRealtimeSync(undefined, () => {
+    loadPayments()
+  })
 
   // Filtered List
   const filteredPayments = useMemo(() => {
@@ -884,9 +892,14 @@ export const PaymentsListPage: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-zinc-200 text-center font-mono text-xs space-y-4 animate-in fade-in zoom-in-95">
             {/* Header */}
             <div className="space-y-1 pb-3 border-b-2 border-dashed border-zinc-300 font-cairo">
-              <h2 className="text-xl font-black tracking-wider text-zinc-950">GYMVIP FITNESS</h2>
-              <p className="text-[10px] text-zinc-500">فرع القاهرة - النزهة الجديدة</p>
-              <p className="text-[10px] text-zinc-400">س.ت: 109283 - ب.ض: 489-201-902</p>
+              {gym?.logo && (
+                <div className="w-12 h-12 mx-auto mb-1.5 overflow-hidden rounded-xl">
+                  <img src={gym.logo} alt={gym.name} className="w-full h-full object-contain" />
+                </div>
+              )}
+              <h2 className="text-xl font-black tracking-wider text-zinc-950 uppercase">{gym?.name || 'GYMVIP FITNESS'}</h2>
+              <p className="text-[10px] text-zinc-500">{gym?.address || (gym?.city ? `فرع ${gym.city}` : 'الفرع الرئيسي')}</p>
+              {gym?.phone && <p className="text-[10px] text-zinc-400 font-mono">هاتف: {gym.phone}</p>}
             </div>
 
             {/* Receipt Info */}
@@ -929,7 +942,7 @@ export const PaymentsListPage: React.FC = () => {
               <span className="text-[9px] text-zinc-400">امسح للتحقق من الفاتورة الضريبية</span>
             </div>
 
-            <p className="text-[10px] text-zinc-500 font-cairo">شكراً لثقتكم بنادي GymVIP!</p>
+            <p className="text-[10px] text-zinc-500 font-cairo">شكراً لثقتكم بنادي {gym?.name || 'GymVIP'}!</p>
 
             <div className="flex items-center gap-2 pt-2 font-cairo">
               <button

@@ -4,12 +4,14 @@ import {
   login,
   logout,
   getMe,
+  updateProfile,
 } from '../controllers/auth.controller.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
 import { validateBody } from '../middlewares/validate.middleware.js'
 import {
   registerSchema,
   loginSchema,
+  updateProfileSchema,
 } from '../validators/auth.validator.js'
 import {
   loginLimiter,
@@ -29,3 +31,4 @@ authRouter.post('/logout', logout)
 
 // Protected authentication routes
 authRouter.get('/me', requireAuth, getMe)
+authRouter.patch('/profile', requireAuth, validateBody(updateProfileSchema), updateProfile)

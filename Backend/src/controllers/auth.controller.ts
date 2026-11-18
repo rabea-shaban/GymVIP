@@ -3,6 +3,7 @@ import {
   registerGymAndOwner,
   loginUser,
   getCurrentUserProfile,
+  updateUserProfile,
 } from '../services/auth.service.js'
 import { setAuthCookie, clearAuthCookie } from '../utils/cookie.util.js'
 import { sendSuccess } from '../utils/response.util.js'
@@ -23,12 +24,12 @@ export const register = async (
     // Set secure HTTPOnly cookie
     setAuthCookie(res, token)
 
-    // Return safe data without token in JSON body
+    // Return authenticated profile and token
     sendSuccess(
       res,
       201,
       'تم إنشاء حساب النادي الرياضي والمالك بنجاح / Gym and owner created successfully',
-      { user, gym }
+      { user, gym, token }
     )
   } catch (error) {
     next(error)
@@ -50,10 +51,11 @@ export const login = async (
     // Set secure HTTPOnly cookie
     setAuthCookie(res, token)
 
-    // Return safe data without token in JSON body
+    // Return authenticated profile and token
     sendSuccess(res, 200, 'تم تسجيل الدخول بنجاح / Logged in successfully', {
       user,
       gym,
+      token,
     })
   } catch (error) {
     next(error)
@@ -100,6 +102,25 @@ export const getMe = async (
     const profile = await getCurrentUserProfile(userId)
 
     sendSuccess(res, 200, 'Authenticated user', profile)
+  } catch (error) {
+    next(error)
+  }
+}
+
+/**
+ * Handles PATCH /api/v1/auth/profile
+ * Updates the current user's profile information (name, phone, avatar)
+ */
+export const updateProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user!.id
+    const { name, phone, avatarUrl } = req.body
+    const updated = await updateUserProfile(userId, { name, phone, avatarUrl })
+    sendSuccess(res, 200, 'تم تحديث الملف الشخصي بنجاح / Profile updated successfully', updated)
   } catch (error) {
     next(error)
   }

@@ -6,6 +6,7 @@ export interface SubscriptionMember {
   phone: string
   memberCode: string
   email?: string | null
+  avatarUrl?: string | null
   isActive: boolean
 }
 

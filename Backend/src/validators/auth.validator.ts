@@ -1,7 +1,9 @@
 import { z } from 'zod'
+import { normalizeEgyptianPhone } from './member.validator.js'
 
 // Egyptian Mobile Number Regex: 010, 011, 012, 015 followed by 8 digits (or optional +20 / 0020 prefix)
 const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+const STRICT_EGYPTIAN_PHONE_REGEX = /^01[0125][0-9]{8}$/
 
 export const registerSchema = z.object({
   gymName: z
@@ -53,3 +55,41 @@ export const loginSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
+
+export const updateProfileSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'يجب أن يتكون الاسم من حرفين على الأقل / Name must be at least 2 characters')
+    .max(100, 'الاسم طويل جداً (الحد الأقصى 100 حرف) / Name is too long')
+    .optional(),
+  phone: z
+    .any()
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (val === undefined) return undefined
+      if (val === null || String(val).trim() === '') return null
+      return normalizeEgyptianPhone(val)
+    })
+    .pipe(
+      z
+        .string()
+        .regex(
+          STRICT_EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+        )
+        .nullable()
+        .optional()
+    ),
+  avatarUrl: z
+    .string()
+    .trim()
+    .refine((val) => !val || val.startsWith('data:image/') || val.startsWith('/uploads/') || /^https?:\/\//i.test(val), {
+      message: 'صيغة رابط الصورة غير صحيحة / Invalid avatar image format',
+    })
+    .optional()
+    .nullable(),
+})
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>

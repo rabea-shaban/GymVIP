@@ -15,7 +15,6 @@ import {
   Building,
   User,
   X,
-  Wallet,
   Ban,
   Plus,
 } from 'lucide-react'
@@ -25,11 +24,12 @@ import { paymentsApi } from '@/features/payments/services/paymentsApi'
 import type { PaymentItem, PaymentSummary, PaymentMethod, WalletProvider } from '@/features/payments/types/payment.types'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { CancelSubscriptionModal } from '../components/CancelSubscriptionModal'
+import { useRealtimeSync } from '@/services/socket'
 
 export const SubscriptionDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const { user, gym } = useAuth()
   const canManage = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'RECEPTIONIST'
   const canCancel = user?.role === 'OWNER' || user?.role === 'MANAGER'
   const subId = id || 'SUB-00841'
@@ -101,6 +101,11 @@ export const SubscriptionDetailPage: React.FC = () => {
     reloadData()
   }, [reloadData])
 
+  // Instant Real-Time WebSocket updates for Subscription Details
+  useRealtimeSync(undefined, () => {
+    reloadData()
+  })
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg)
     setShowToast(true)
@@ -116,14 +121,35 @@ export const SubscriptionDetailPage: React.FC = () => {
 
   const memberName = realSubscription?.member?.name || 'عضو غير محدد'
   const memberCode = realSubscription?.member?.memberCode || ''
+  const memberAvatar = realSubscription?.member?.avatarUrl || null
+  const memberPhone = realSubscription?.member?.phone || ''
+  const memberEmail = realSubscription?.member?.email || ''
+  const isMemberActive = realSubscription?.member?.isActive ?? true
   const planName = realSubscription?.planName || 'باقة غير محددة'
   const planPrice = realSubscription ? parseFloat(realSubscription.planPrice) : 0
   const durationDays = realSubscription?.durationDays || 30
   const startDateText = realSubscription?.startDate
-    ? new Date(realSubscription.startDate).toLocaleDateString('ar-EG')
+    ? new Date(realSubscription.startDate).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
     : '-'
   const endDateText = realSubscription?.endDate
-    ? new Date(realSubscription.endDate).toLocaleDateString('ar-EG')
+    ? new Date(realSubscription.endDate).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : '-'
+  const createdAtText = realSubscription?.createdAt
+    ? new Date(realSubscription.createdAt).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : '-'
 
   const totalPaid = financialSummary ? parseFloat(financialSummary.paidAmount) : 0
@@ -255,15 +281,20 @@ export const SubscriptionDetailPage: React.FC = () => {
                   <span>تجديد الاشتراك</span>
                 </button>
 
-                {(realSubscription ? realSubscription.effectiveStatus === 'ACTIVE' : !isFrozen && !isExpired) && (
-                  <button
-                    onClick={() => setShowFreezeModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white text-zinc-800 border border-zinc-200 hover:bg-zinc-50 shadow-sm transition"
-                  >
-                    <Snowflake className="w-4 h-4 text-blue-500" />
-                    <span>تجميد الاشتراك</span>
-                  </button>
-                )}
+                {gym?.subscriptionFreezeEnabled !== false &&
+                  (realSubscription ? realSubscription.effectiveStatus === 'ACTIVE' : !isFrozen && !isExpired) && (
+                    <button
+                      onClick={() => {
+                        const defaultDays = gym?.allowedFreezeDurations?.[0] || 7
+                        setFreezeDays(String(defaultDays))
+                        setShowFreezeModal(true)
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white text-zinc-800 border border-zinc-200 hover:bg-zinc-50 shadow-sm transition"
+                    >
+                      <Snowflake className="w-4 h-4 text-blue-500" />
+                      <span>تجميد الاشتراك</span>
+                    </button>
+                  )}
 
                 {canCancel && (realSubscription ? (realSubscription.status === 'ACTIVE' || realSubscription.status === 'FROZEN') : (!isExpired && !isCancelled)) && (
                   <button
@@ -303,8 +334,12 @@ export const SubscriptionDetailPage: React.FC = () => {
           {/* Top Row: Member & Status Badges */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-950 text-white flex items-center justify-center p-2.5 shrink-0 shadow-sm">
-                <Building className="w-6 h-6 text-[#F5D86B]" />
+              <div className="w-12 h-12 rounded-2xl bg-zinc-950 text-white flex items-center justify-center p-0.5 shrink-0 shadow-sm overflow-hidden border border-zinc-800">
+                {memberAvatar ? (
+                  <img src={memberAvatar} alt={memberName} className="w-full h-full object-cover rounded-2xl" />
+                ) : (
+                  <Building className="w-6 h-6 text-[#F5D86B]" />
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -530,10 +565,12 @@ export const SubscriptionDetailPage: React.FC = () => {
             <span className="text-xs font-bold text-zinc-500">مدة الاشتراك</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-black text-zinc-950">
-              30 <span className="text-sm font-bold text-zinc-500">يوم</span>
+            <div className="text-2xl sm:text-3xl font-black text-zinc-950 font-mono">
+              {durationDays} <span className="text-sm font-bold text-zinc-500 font-cairo">يوم</span>
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">شهر ميلادي كامل</div>
+            <div className="text-[11px] text-zinc-400 mt-0.5">
+              {durationDays === 30 ? 'شهر ميلادي كامل' : `${durationDays} يوماً متواصلاً`}
+            </div>
           </div>
         </div>
       </div>
@@ -555,28 +592,30 @@ export const SubscriptionDetailPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
               <div>
                 <span className="text-zinc-400 block mb-1">الباقة الرياضية</span>
-                <span className="font-bold text-zinc-950 text-sm">اشتراك شهري (VIP Fitness)</span>
+                <span className="font-bold text-zinc-950 text-sm">{planName}</span>
               </div>
 
               <div>
                 <span className="text-zinc-400 block mb-1">نوع المدة التعاقدية</span>
-                <span className="font-bold text-zinc-950 text-sm">30 يوماً متواصلاً</span>
+                <span className="font-bold text-zinc-950 text-sm font-mono">{durationDays} يوماً متواصلاً</span>
               </div>
 
               <div>
                 <span className="text-zinc-400 block mb-1">تاريخ البداية</span>
-                <span className="font-bold text-zinc-900 text-sm">10 سبتمبر 2026</span>
+                <span className="font-bold text-zinc-900 text-sm font-mono">{startDateText}</span>
               </div>
 
               <div>
                 <span className="text-zinc-400 block mb-1">تاريخ الانتهاء</span>
-                <span className="font-bold text-zinc-900 text-sm">9 أكتوبر 2026</span>
+                <span className="font-bold text-zinc-900 text-sm font-mono">{endDateText}</span>
               </div>
 
               <div>
                 <span className="text-zinc-400 block mb-1">السعر وقت الاشتراك</span>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-black text-zinc-950 text-sm">500 ج.م</span>
+                  <span className="font-black text-zinc-950 text-sm font-mono">
+                    {planPrice.toLocaleString('ar-EG')} ج.م
+                  </span>
                   <span className="text-[11px] text-zinc-400">(تاريخي ثابت ومعتمد)</span>
                 </div>
               </div>
@@ -601,6 +640,13 @@ export const SubscriptionDetailPage: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              {realSubscription?.notes && (
+                <div className="md:col-span-2 p-3 bg-zinc-50 border border-zinc-200/80 rounded-xl">
+                  <span className="text-zinc-500 font-bold block mb-1">ملاحظات الاشتراك:</span>
+                  <span className="text-zinc-800 font-medium leading-relaxed">{realSubscription.notes}</span>
+                </div>
+              )}
             </div>
 
             {/* Created By Footnote */}
@@ -608,10 +654,10 @@ export const SubscriptionDetailPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-zinc-400" />
                 <span>أنشئ بواسطة:</span>
-                <strong className="text-zinc-900">عمر حسن (موظف استقبال)</strong>
+                <strong className="text-zinc-900">إدارة النادي والاستقبال</strong>
               </div>
-              <div className="text-zinc-400 text-[11px]">
-                تاريخ ووقت الإنشاء: 10 سبتمبر 2026 — 09:15 ص
+              <div className="text-zinc-400 text-[11px] font-mono">
+                تاريخ ووقت الإنشاء: {createdAtText}
               </div>
             </div>
           </div>
@@ -625,7 +671,7 @@ export const SubscriptionDetailPage: React.FC = () => {
                   <h3 className="text-base font-black text-zinc-950">المدفوعات المرتبطة</h3>
                 </div>
                 <div className="text-xs text-zinc-500 mt-0.5">
-                  {totalPaid} ج.م مدفوع من أصل 500 ج.م (المتبقي: {remainingDebt} ج.م)
+                  {totalPaid.toLocaleString('ar-EG')} ج.م مدفوع من أصل {planPrice.toLocaleString('ar-EG')} ج.م (المتبقي: {remainingDebt.toLocaleString('ar-EG')} ج.م)
                 </div>
               </div>
 
@@ -677,12 +723,12 @@ export const SubscriptionDetailPage: React.FC = () => {
                         </td>
                         <td className="py-3.5 px-3">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-800 font-bold text-[11px]">
-                            <span>{p.method === 'CASH' ? 'نقدي (كاش)' : `محفظة (${p.walletProvider})`}</span>
+                            <span>{p.method === 'CASH' ? 'نقدي (كاش)' : `محفظة (${p.walletProvider || ''})`}</span>
                           </span>
                         </td>
                         <td className="py-3.5 px-3 font-mono text-zinc-500">{p.transactionReference || '—'}</td>
                         <td className="py-3.5 px-3 font-medium text-zinc-700 font-mono">
-                          {p.createdAt ? p.createdAt.split('T')[0] : ''}
+                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('ar-EG') : '—'}
                         </td>
                         <td className="py-3.5 px-3 text-center">
                           <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -700,61 +746,11 @@ export const SubscriptionDetailPage: React.FC = () => {
                       </tr>
                     ))
                   ) : (
-                    <>
-                      {/* Payment Row 1 */}
-                      <tr className="hover:bg-zinc-50/50 transition">
-                        <td className="py-3.5 px-4 font-mono font-bold text-zinc-900">PAY-00482</td>
-                        <td className="py-3.5 px-3 font-black text-zinc-950 text-sm">200 ج.م</td>
-                        <td className="py-3.5 px-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-800 font-bold text-[11px]">
-                            <span>$</span>
-                            <span>نقدي (كاش)</span>
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-zinc-400">—</td>
-                        <td className="py-3.5 px-3 font-medium text-zinc-700">10 سبتمبر 2026</td>
-                        <td className="py-3.5 px-3 text-center">
-                          <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            مكتملة
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-left">
-                          <button
-                            onClick={() => triggerToast('عرض إيصال PAY-00482')}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 transition"
-                          >
-                            عرض الدفعة
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Payment Row 2 */}
-                      <tr className="hover:bg-zinc-50/50 transition">
-                        <td className="py-3.5 px-4 font-mono font-bold text-zinc-900">PAY-00491</td>
-                        <td className="py-3.5 px-3 font-black text-zinc-950 text-sm">100 ج.م</td>
-                        <td className="py-3.5 px-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-900 border border-purple-200 font-bold text-[11px]">
-                            <Wallet className="w-3 h-3 text-purple-700" />
-                            <span>محفظة إلكترونية (فودافون كاش)</span>
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-zinc-600 text-xs">WLT-829341</td>
-                        <td className="py-3.5 px-3 font-medium text-zinc-700">12 سبتمبر 2026</td>
-                        <td className="py-3.5 px-3 text-center">
-                          <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            مكتملة
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-left">
-                          <button
-                            onClick={() => triggerToast('عرض إيصال PAY-00491')}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 transition"
-                          >
-                            عرض الدفعة
-                          </button>
-                        </td>
-                      </tr>
-                    </>
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-zinc-400 font-medium">
+                        لا توجد مدفوعات مسجلة لهذا الاشتراك حتى الآن
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -826,25 +822,77 @@ export const SubscriptionDetailPage: React.FC = () => {
             </div>
 
             <div className="space-y-4 text-xs relative pr-4 before:absolute before:right-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-100">
-              {/* Event 1 */}
+              {/* Event 1: Creation */}
               <div className="relative pr-4">
                 <span className="w-3 h-3 rounded-full bg-zinc-950 absolute -right-[5px] top-1"></span>
                 <div className="font-bold text-zinc-950 text-sm">تم إنشاء الاشتراك وبدء الخدمة</div>
-                <div className="text-[11px] text-zinc-400 mt-0.5">10 سبتمبر 2026 — 09:15 ص</div>
+                <div className="text-[11px] text-zinc-400 mt-0.5 font-mono">{createdAtText}</div>
                 <p className="text-zinc-600 mt-1 leading-relaxed">
-                  تم تسجيل الاشتراك بنجاح بالقيمة التعاقدية {planPrice} ج.م.
+                  تم تسجيل الاشتراك بنجاح بالقيمة التعاقدية {planPrice.toLocaleString('ar-EG')} ج.م لباقة {planName}.
+                  {realSubscription?.notes ? ` (ملاحظة: ${realSubscription.notes})` : ''}
                 </p>
               </div>
 
-              {/* Event 2 */}
-              <div className="relative pr-4">
-                <span className="w-3 h-3 rounded-full bg-emerald-500 absolute -right-[5px] top-1"></span>
-                <div className="font-bold text-zinc-950 text-sm">تم تسجيل دفعات مالية</div>
-                <div className="text-[11px] text-zinc-400 mt-0.5">سجل الخزينة</div>
-                <p className="text-zinc-600 mt-1 leading-relaxed">
-                  إجمالي المسدد: {totalPaid} ج.م | المتبقي: {remainingDebt} ج.م
-                </p>
-              </div>
+              {/* Event 2: Payments */}
+              {subscriptionPayments.map((p) => (
+                <div key={p.id} className="relative pr-4">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 absolute -right-[5px] top-1"></span>
+                  <div className="font-bold text-zinc-950 text-sm">
+                    سداد دفعة مالية بقيمة {Number(p.amount).toLocaleString('ar-EG')} ج.م
+                  </div>
+                  <div className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                    {new Date(p.createdAt).toLocaleDateString('ar-EG', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                  <p className="text-zinc-600 mt-1 leading-relaxed">
+                    طريقة السداد: {p.method === 'CASH' ? 'نقدي (كاش بالخزينة)' : `محفظة إلكترونية (${p.walletProvider || ''})`}
+                    {p.transactionReference ? ` • مرجع: ${p.transactionReference}` : ''}
+                    {p.notes ? ` • بيان: ${p.notes}` : ''}
+                  </p>
+                </div>
+              ))}
+
+              {/* Event 3: Freezes */}
+              {freezeHistory.map((f) => (
+                <div key={f.id} className="relative pr-4">
+                  <span className="w-3 h-3 rounded-full bg-blue-500 absolute -right-[5px] top-1"></span>
+                  <div className="font-bold text-zinc-950 text-sm">
+                    تجميد الاشتراك ({f.days} يوم)
+                  </div>
+                  <div className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                    {new Date(f.createdAt).toLocaleDateString('ar-EG', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </div>
+                  <p className="text-zinc-600 mt-1 leading-relaxed">
+                    فترة التجميد من {f.startDate.split('T')[0]} إلى {f.endDate.split('T')[0]}
+                    {f.reason ? ` • السبب: ${f.reason}` : ''}
+                  </p>
+                </div>
+              ))}
+
+              {/* Event 4: Cancellation (if any) */}
+              {isCancelled && (
+                <div className="relative pr-4">
+                  <span className="w-3 h-3 rounded-full bg-rose-500 absolute -right-[5px] top-1"></span>
+                  <div className="font-bold text-rose-950 text-sm">تم إلغاء الاشتراك نهائياً</div>
+                  <div className="text-[11px] text-rose-600 mt-0.5 font-mono">
+                    {realSubscription?.cancelledAt ? new Date(realSubscription.cancelledAt).toLocaleString('ar-EG') : 'تم الإلغاء'}
+                  </div>
+                  <p className="text-rose-700 mt-1 leading-relaxed">
+                    السبب: {realSubscription?.cancellationReason || '—'}
+                    {realSubscription?.cancelledByUser?.name ? ` • بواسطة: ${realSubscription.cancelledByUser.name}` : ''}
+                    {realSubscription?.cancellationNotes ? ` • ملاحظات: ${realSubscription.cancellationNotes}` : ''}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -855,28 +903,53 @@ export const SubscriptionDetailPage: React.FC = () => {
           <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
               <h3 className="text-sm font-black text-zinc-950">بيانات العضو</h3>
-              <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                عضو نشط
+              <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
+                isMemberActive
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
+              }`}>
+                {isMemberActive ? 'عضو نشط' : 'عضو غير نشط'}
               </span>
             </div>
 
             <div className="p-3.5 bg-zinc-50 rounded-2xl border border-zinc-200/70 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                م.أ
+              <div className="w-12 h-12 rounded-2xl bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-xs border border-zinc-800">
+                {memberAvatar ? (
+                  <img src={memberAvatar} alt={memberName} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{memberName.slice(0, 2)}</span>
+                )}
               </div>
-              <div>
-                <h4 className="font-black text-zinc-950 text-sm">{memberName}</h4>
-                <div className="text-xs text-zinc-400 font-mono mt-0.5">كود : {memberCode}</div>
+              <div className="overflow-hidden">
+                <h4 className="font-black text-zinc-950 text-sm truncate">{memberName}</h4>
+                <div className="text-xs text-zinc-400 font-mono mt-0.5">كود: {memberCode}</div>
+                {memberPhone && (
+                  <div className="text-[11px] text-zinc-500 font-mono mt-0.5" dir="ltr">
+                    {memberPhone}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-zinc-500">الرصيد المدين:</span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800">
-                  مستحق {remainingDebt} ج.م
+                <span
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                    remainingDebt > 0
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  {remainingDebt > 0 ? `مستحق ${remainingDebt.toLocaleString('ar-EG')} ج.م` : 'مسدد بالكامل'}
                 </span>
               </div>
+              {memberEmail && (
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400">البريد:</span>
+                  <span className="text-zinc-700 font-mono truncate max-w-[170px]">{memberEmail}</span>
+                </div>
+              )}
             </div>
 
             <button
@@ -937,7 +1010,7 @@ export const SubscriptionDetailPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-600 leading-relaxed">
-                  يمكن تجديد الاشتراك مبكراً مع احتساب المدة تلقائياً بعد نهاية الاشتراك الحالي.
+                  يمكن تجديد الاشتراك مبكراً مع احتساب المدة تلقائياً بعد نهاية الاشتراك الحالي ({endDateText}).
                 </p>
                 {canManage && (
                   <button
@@ -985,10 +1058,14 @@ export const SubscriptionDetailPage: React.FC = () => {
                   onChange={(e) => setFreezeDays(e.target.value)}
                   className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900"
                 >
-                  <option value="3">3 أيام</option>
-                  <option value="7">7 أيام (أسبوع)</option>
-                  <option value="15">15 يوماً (أسبوعان)</option>
-                  <option value="30">30 يوماً (شهر كامل)</option>
+                  {(gym?.allowedFreezeDurations && gym.allowedFreezeDurations.length > 0
+                    ? gym.allowedFreezeDurations
+                    : [3, 7, 15, 30]
+                  ).map((d) => (
+                    <option key={d} value={String(d)}>
+                      {d} {d === 1 ? 'يوم' : d === 2 ? 'يومان' : d <= 10 ? 'أيام' : 'يوماً'}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1052,7 +1129,7 @@ export const SubscriptionDetailPage: React.FC = () => {
                 <div className="w-8 h-8 rounded-xl bg-gold-100 text-gold-800 flex items-center justify-center">
                   <RotateCcw className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-zinc-950">تجديد اشتراك محمد أحمد</h3>
+                <h3 className="text-base font-bold text-zinc-950">تجديد اشتراك {memberName}</h3>
               </div>
               <button
                 onClick={() => setShowRenewModal(false)}
@@ -1065,15 +1142,13 @@ export const SubscriptionDetailPage: React.FC = () => {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-bold text-zinc-800 mb-1">نوع التجديد</label>
-                <select className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900">
-                  <option>نفس الباقة: شهر إضافي (500 ج.م)</option>
-                  <option>ترقية: 3 أشهر (1,350 ج.م)</option>
-                  <option>ترقية: سنوي VIP شامل (4,500 ج.م)</option>
-                </select>
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900">
+                  نفس الباقة: {planName} ({planPrice.toLocaleString('ar-EG')} ج.م)
+                </div>
               </div>
 
               <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-zinc-600">
-                يبدأ التجديد التلقائي اعتباراً من تاريخ انتهاء الباقة الحالية (9 أكتوبر 2026).
+                يبدأ التجديد التلقائي اعتباراً من تاريخ انتهاء الباقة الحالية ({endDateText}).
               </div>
             </div>
 

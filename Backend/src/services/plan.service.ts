@@ -11,6 +11,7 @@ import type {
 } from '../validators/plan.validator.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 
 /**
  * Formats a raw Prisma MembershipPlan record into a clean, safe DTO
@@ -81,6 +82,8 @@ export async function createPlan(
     description: `تم إنشاء باقة اشتراك جديدة (${plan.name}) بسعر (${dto.price} ${dto.currency})`,
     afterData: dto,
   })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'plans', action: 'created', planId: plan.id })
 
   return dto
 }
@@ -223,6 +226,8 @@ export async function updatePlan(
     afterData: dto,
   })
 
+  emitGymEvent(gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'plans', action: 'updated', planId: updatedPlan.id })
+
   return dto
 }
 
@@ -267,6 +272,8 @@ export async function updatePlanStatus(
     beforeData: { isActive: existingPlan.isActive },
     afterData: { isActive: updatedPlan.isActive },
   })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'plans', action: 'status_changed', planId: updatedPlan.id })
 
   return dto
 }
@@ -335,5 +342,7 @@ export async function deletePlan(
     description: `تم حذف باقة الاشتراك (${existingPlan.name}) نهائياً`,
     beforeData: formatPlanDto(existingPlan),
   })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'plans', action: 'deleted', planId })
 }
 

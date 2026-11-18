@@ -15,13 +15,14 @@ import {
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/feedback/Toast'
 import { plansApi } from '@/features/plans/services/plansApi'
+import { validateName, extractBackendErrors } from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
 
 export const PlanCreatePage: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
 
   const [isSaving, setIsSaving] = useState(false)
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false)
 
   // Form Fields State
   const [planName, setPlanName] = useState('')
@@ -31,6 +32,7 @@ export const PlanCreatePage: React.FC = () => {
   const [description, setDescription] = useState('')
   const [isAvailableForNew, setIsAvailableForNew] = useState(true)
   const [isVipFeatured, setIsVipFeatured] = useState(false)
+  const [planErrors, setPlanErrors] = useState<Record<string, string>>({})
 
   // Unsaved Modal
   const [showUnsavedModal, setShowUnsavedModal] = useState(false)
@@ -63,13 +65,74 @@ export const PlanCreatePage: React.FC = () => {
     setPrice(preset.price)
     setIsVipFeatured(!!preset.vip)
     setDescription(preset.desc)
+    setPlanErrors({})
     toast.success(`تم تطبيق نموذج "${preset.name}" بنجاح`)
   }
 
+  const handlePlanNameChange = (val: string) => {
+    setPlanName(val)
+    if (!val.trim()) {
+      setPlanErrors((prev) => ({ ...prev, name: 'اسم الخطة مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم الخطة', 2, 100)
+      setPlanErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handlePriceChange = (val: number) => {
+    setPrice(val)
+    let err = ''
+    if (val < 0) {
+      err = 'سعر الاشتراك لا يمكن أن يكون سالباً'
+    } else if (val > 1000000) {
+      err = 'سعر الاشتراك يتجاوز الحد الأقصى المسموح به'
+    }
+    setPlanErrors((prev) => ({ ...prev, price: err }))
+  }
+
+  const handleDurationChange = (val: number, unit = durationUnit) => {
+    setDurationValue(val)
+    let days = val
+    if (unit === 'MONTHS') days = val * 30
+    else if (unit === 'YEARS') days = val * 365
+    let err = ''
+    if (days < 1) {
+      err = 'مدة الاشتراك يجب أن تكون يوماً واحداً على الأقل'
+    } else if (days > 3650) {
+      err = 'مدة الاشتراك يجب ألا تتجاوز 10 سنوات (3650 يوماً)'
+    }
+    setPlanErrors((prev) => ({ ...prev, durationDays: err }))
+  }
+
+  const validatePlan = () => {
+    const errs: Record<string, string> = {}
+    const nameRes = validateName(planName, 'اسم الخطة', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    if (totalDays < 1) {
+      errs.durationDays = 'مدة الاشتراك يجب أن تكون يوماً واحداً على الأقل'
+    } else if (totalDays > 3650) {
+      errs.durationDays = 'مدة الاشتراك يجب ألا تتجاوز 10 سنوات (3650 يوماً)'
+    }
+
+    if (price === undefined || price === null || price < 0) {
+      errs.price = 'سعر الاشتراك لا يمكن أن يكون سالباً'
+    } else if (price > 1000000) {
+      errs.price = 'سعر الاشتراك يتجاوز الحد الأقصى المسموح به'
+    }
+
+    if (description.trim().length > 500) {
+      errs.description = 'الوصف طويل جداً (الحد الأقصى 500 حرف)'
+    }
+
+    setPlanErrors(errs)
+    return { isValid: Object.keys(errs).length === 0, errors: errs }
+  }
+
   const handleSavePlan = async (addAnother: boolean = false) => {
-    setHasAttemptedSubmit(true)
-    if (!planName.trim() || price === undefined || price < 0) {
-      toast.error('يرجى ملء جميع الحقول الإلزامية المطلوبة (اسم الخطة وسعر الاشتراك)')
+    const { isValid, errors: validationErrors } = validatePlan()
+    if (!isValid) {
+      toast.error(Object.values(validationErrors)[0])
       return
     }
 
@@ -90,13 +153,16 @@ export const PlanCreatePage: React.FC = () => {
         setDurationValue(30)
         setDescription('')
         setIsVipFeatured(false)
-        setHasAttemptedSubmit(false)
+        setPlanErrors({})
       } else {
         setTimeout(() => navigate('/app/plans'), 400)
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'فشل إنشاء الباقة'
-      toast.error(msg)
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setPlanErrors(backendErrors)
+      }
+      toast.error(generalMessage || 'فشل إنشاء الباقة')
     } finally {
       setIsSaving(false)
     }
@@ -283,11 +349,11 @@ export const PlanCreatePage: React.FC = () => {
                   <input
                     type="text"
                     value={planName}
-                    onChange={(e) => setPlanName(e.target.value)}
+                    onChange={(e) => handlePlanNameChange(e.target.value)}
                     placeholder="مثال: الاشتراك الشهري المميز"
                     className={cn(
                       'w-full pr-4 pl-10 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-bold',
-                      hasAttemptedSubmit && !planName
+                      planErrors.name
                         ? 'border-rose-400 bg-rose-50/50 text-rose-900'
                         : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                     )}
@@ -296,9 +362,7 @@ export const PlanCreatePage: React.FC = () => {
                     <CreditCard className="w-4 h-4" />
                   </div>
                 </div>
-                {hasAttemptedSubmit && !planName && (
-                  <p className="text-[11px] text-rose-600 font-bold mt-1">حقل اسم الخطة مطلوب</p>
-                )}
+                <FieldError error={planErrors.name} />
               </div>
 
               {/* Field Grid: Duration & Price */}
@@ -319,7 +383,7 @@ export const PlanCreatePage: React.FC = () => {
                         type="number"
                         min="1"
                         value={durationValue}
-                        onChange={(e) => setDurationValue(Number(e.target.value) || 0)}
+                        onChange={(e) => handleDurationChange(Number(e.target.value) || 0)}
                         className="w-full pr-4 pl-10 py-2.5 text-xs sm:text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:border-zinc-900 focus:outline-none transition-all font-mono font-bold"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
@@ -328,7 +392,11 @@ export const PlanCreatePage: React.FC = () => {
                     </div>
                     <select
                       value={durationUnit}
-                      onChange={(e) => setDurationUnit(e.target.value as any)}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as any
+                        setDurationUnit(newUnit)
+                        handleDurationChange(durationValue, newUnit)
+                      }}
                       className="w-28 px-3 py-2.5 text-xs bg-zinc-50 border border-zinc-200 rounded-xl font-bold cursor-pointer"
                     >
                       <option value="DAYS">يوم</option>
@@ -336,6 +404,7 @@ export const PlanCreatePage: React.FC = () => {
                       <option value="YEARS">سنة</option>
                     </select>
                   </div>
+                  <FieldError error={planErrors.durationDays} />
                 </div>
 
                 {/* Price */}
@@ -351,10 +420,10 @@ export const PlanCreatePage: React.FC = () => {
                       type="number"
                       min="0"
                       value={price}
-                      onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                      onChange={(e) => handlePriceChange(Number(e.target.value) || 0)}
                       className={cn(
                         'w-full pr-4 pl-20 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-mono font-black text-lg',
-                        hasAttemptedSubmit && (price === undefined || price < 0)
+                        planErrors.price
                           ? 'border-rose-400 bg-rose-50/50 text-rose-900'
                           : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                       )}
@@ -363,6 +432,7 @@ export const PlanCreatePage: React.FC = () => {
                       ج.م (EGP)
                     </span>
                   </div>
+                  <FieldError error={planErrors.price} />
                 </div>
               </div>
 

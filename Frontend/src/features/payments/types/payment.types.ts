@@ -36,6 +36,7 @@ export interface PaymentGym {
   name: string
   phone?: string | null
   address?: string | null
+  logo?: string | null
 }
 
 export interface PaymentSummary {

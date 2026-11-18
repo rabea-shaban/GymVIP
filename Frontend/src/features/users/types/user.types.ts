@@ -7,6 +7,7 @@ export interface UserItem {
   email: string
   phone: string | null
   role: UserRole
+  avatarUrl?: string | null
   isActive: boolean
   lastLoginAt: string | null
   createdAt: string
@@ -31,12 +32,14 @@ export interface CreateUserInput {
   phone?: string | null
   role: UserRole
   password: string
+  avatarUrl?: string | null
 }
 
 export interface UpdateUserInput {
   name?: string
   phone?: string | null
   role?: UserRole
+  avatarUrl?: string | null
 }
 
 export interface UserFilterParams {

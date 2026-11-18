@@ -20,6 +20,8 @@ import { useToast } from '@/components/feedback/Toast'
 import { membersApi } from '../services/membersApi'
 import type { MemberItem, MemberPagination, MemberStats } from '../types/member.types'
 import { ExportDropdown } from '@/components/ui/ExportDropdown'
+import { useRealtimeSync } from '@/services/socket'
+import { getMediaUrl } from '@/lib/media'
 
 interface MemberRecord {
   id: string
@@ -206,6 +208,11 @@ export const MembersListPage: React.FC = () => {
     setPage(1)
     loadMembers(1, pageSize)
   }, [searchTerm, memberStatusFilter, genderFilter])
+
+  // Instant Real-Time WebSocket updates for Members List
+  useRealtimeSync(undefined, () => {
+    loadMembers(page, pageSize)
+  })
 
   // Pagination navigation handlers
   const handlePageChange = (newPage: number) => {
@@ -396,8 +403,8 @@ export const MembersListPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-zinc-200/90 p-4 shadow-2xs space-y-2 col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between text-zinc-500">
             <span className="text-[11px] font-bold text-zinc-600">أعضاء جدد هذا الشهر</span>
-            <div className="w-7 h-7 rounded-lg bg-zinc-950 text-gym-gold flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg bg-zinc-950 text-white flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5 text-white" />
             </div>
           </div>
           <div className="text-2xl font-black text-zinc-950 font-mono">
@@ -550,7 +557,7 @@ export const MembersListPage: React.FC = () => {
                             )}
                           >
                             {item.avatarUrl ? (
-                              <img src={item.avatarUrl} alt={item.name} className="w-full h-full object-cover" />
+                              <img src={getMediaUrl(item.avatarUrl)} alt={item.name} className="w-full h-full object-cover" />
                             ) : (
                               item.avatarLetters
                             )}
@@ -868,7 +875,7 @@ export const MembersListPage: React.FC = () => {
                 )}
               >
                 {selectedMember.avatarUrl ? (
-                  <img src={selectedMember.avatarUrl} alt={selectedMember.name} className="w-full h-full object-cover" />
+                  <img src={getMediaUrl(selectedMember.avatarUrl)} alt={selectedMember.name} className="w-full h-full object-cover" />
                 ) : (
                   selectedMember.avatarLetters
                 )}

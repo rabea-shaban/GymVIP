@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { User, UserRole } from '@/types'
+import type { GymProfile } from '@/features/gym/types/gym.types'
 import { AuthContextType, LoginCredentials } from '../types'
 
 const MOCK_USER: User = {
@@ -16,6 +17,7 @@ const MOCK_USER: User = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 import { authApi } from '../services/authApi'
+import { reauthenticateSocket, disconnectSocket } from '@/services/socket'
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
@@ -29,15 +31,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null
   })
+
+  const [gym, setGym] = useState<GymProfile | null>(() => {
+    const saved = localStorage.getItem('gymvip_gym')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
+
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
   useEffect(() => {
     if (user) {
       localStorage.setItem('gymvip_mock_user', JSON.stringify(user))
+      const token = localStorage.getItem('accessToken') || ''
+      reauthenticateSocket(token)
     } else {
       localStorage.removeItem('gymvip_mock_user')
+      disconnectSocket()
     }
   }, [user])
+
+  useEffect(() => {
+    if (gym) {
+      localStorage.setItem('gymvip_gym', JSON.stringify(gym))
+      if (gym.name) {
+        document.title = `${gym.name} | إدارة الصالات الرياضية`
+      }
+    } else {
+      localStorage.removeItem('gymvip_gym')
+      document.title = 'GymVIP | إدارة الصالات الرياضية'
+    }
+  }, [gym])
 
   // Verify backend session on mount
   useEffect(() => {
@@ -51,16 +81,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: data.user.email,
             phone: data.user.phone || '',
             role: data.user.role,
+            avatarUrl: data.user.avatarUrl || undefined,
             isActive: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }
           setUser(loggedUser)
         }
+        if (data?.gym) {
+          setGym(data.gym)
+        }
       } catch (err: any) {
         if (err.response?.status === 401) {
           setUser(null)
+          setGym(null)
           localStorage.removeItem('gymvip_mock_user')
+          localStorage.removeItem('gymvip_gym')
         }
       }
     }
@@ -82,11 +118,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: data.user.email,
           phone: data.user.phone || '',
           role: data.user.role,
+          avatarUrl: data.user.avatarUrl || undefined,
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
+        if (data.token) {
+          localStorage.setItem('gymvip_token', data.token)
+          localStorage.setItem('accessToken', data.token)
+          reauthenticateSocket(data.token)
+        }
         setUser(loggedUser)
+        if (data.gym) {
+          setGym(data.gym)
+        }
         return
       } catch (err: any) {
         if (
@@ -125,9 +170,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Ignore network error on logout
     } finally {
       setUser(null)
+      setGym(null)
       localStorage.removeItem('gymvip_token')
+      localStorage.removeItem('accessToken')
       localStorage.removeItem('gymvip_mock_user')
+      localStorage.removeItem('gymvip_gym')
     }
+  }, [])
+
+  const updateUserData = useCallback((updated: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null
+      const next = { ...prev, ...updated }
+      localStorage.setItem('gymvip_mock_user', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const updateGymData = useCallback((updated: Partial<GymProfile>) => {
+    setGym((prev) => {
+      if (!prev) return updated as GymProfile
+      const next = { ...prev, ...updated }
+      localStorage.setItem('gymvip_gym', JSON.stringify(next))
+      return next
+    })
   }, [])
 
   const switchRole = useCallback((role: UserRole) => {
@@ -146,10 +212,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        gym,
         isAuthenticated: !!user,
         isLoading,
         login,
         logout,
+        updateUserData,
+        updateGymData,
         switchRole,
         hasRole,
         hasAnyRole,

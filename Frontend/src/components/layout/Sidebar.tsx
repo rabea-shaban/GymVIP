@@ -4,7 +4,8 @@ import {
   LayoutDashboard,
   Users,
   Award,
-  Sparkles,
+  Layers,
+  Monitor,
   CalendarCheck,
   CreditCard,
   UserCheck,
@@ -21,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { UserRole } from '@/types'
+import { getMediaUrl } from '@/lib/media'
 
 interface NavItem {
   title: string
@@ -49,6 +51,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: 'إدارة المشتركين',
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
     items: [
       {
         title: 'المشتركين',
@@ -63,24 +66,26 @@ const NAV_SECTIONS: NavSection[] = [
       {
         title: 'خطط العضوية',
         href: '/app/plans',
-        icon: Sparkles,
+        icon: Layers,
         roles: ['OWNER', 'MANAGER'],
       },
     ],
   },
   {
     title: 'العمليات',
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
     items: [
       {
         title: 'شاشة الاستقبال السريعة',
         href: '/app/reception/dashboard',
-        icon: Sparkles,
+        icon: Monitor,
         roles: ['RECEPTIONIST', 'OWNER', 'MANAGER'],
       },
       {
         title: 'الحضور والانصراف',
         href: '/app/attendance',
         icon: CalendarCheck,
+        roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
       },
       {
         title: 'المدفوعات',
@@ -171,10 +176,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const { user } = useAuth()
+  const { user, gym } = useAuth()
   const location = useLocation()
 
-  const currentRole = user?.role || 'OWNER'
+  const currentRole = user?.role || 'TRAINER'
 
   const filteredSections = NAV_SECTIONS.map((section) => {
     if (section.roles && !section.roles.includes(currentRole)) {
@@ -190,15 +195,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       })
       .map((item) => {
         if (item.href === '/app/dashboard' && currentRole === 'TRAINER') {
-          return { ...item, href: '/app/trainer/dashboard' }
+          return { ...item, title: 'لوحة تحكم المدرب', href: '/app/trainer/dashboard' }
+        }
+        if (item.href === '/app/dashboard' && currentRole === 'RECEPTIONIST') {
+          return { ...item, title: 'لوحة الاستقبال السريعة', href: '/app/reception/dashboard' }
         }
         return item
       })
 
     if (filteredItems.length === 0) return null
 
+    const sectionTitle =
+      section.title === 'المدربين' && currentRole === 'TRAINER'
+        ? 'التدريب والمتدربين'
+        : section.title
+
     return {
       ...section,
+      title: sectionTitle,
       items: filteredItems,
     }
   }).filter(Boolean) as NavSection[]
@@ -224,16 +238,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800/80 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-gym-gold to-amber-600 flex items-center justify-center shrink-0 shadow-gold-glow">
-              <Crown className="w-5 h-5 text-gym-black stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-gym-gold to-amber-600 flex items-center justify-center shrink-0 shadow-gold-glow overflow-hidden">
+              {gym?.logo ? (
+                <img
+                  src={getMediaUrl(gym.logo)}
+                  alt={gym.name || 'شعار النادي'}
+                  className="w-full h-full object-contain p-1"
+                />
+              ) : (
+                <Crown className="w-5 h-5 text-gym-black stroke-[2.5]" />
+              )}
             </div>
             {!isCollapsed && (
-              <div className="flex flex-col animate-in fade-in duration-200">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-lg tracking-wider text-white">Gym</span>
-                  <span className="font-black text-lg text-gym-gold">VIP</span>
-                </div>
-                <span className="text-[10px] text-zinc-400 font-medium">إدارة الصالات الرياضية</span>
+              <div className="flex flex-col animate-in fade-in duration-200 overflow-hidden text-right">
+                <span
+                  className="font-black text-sm tracking-tight text-white truncate max-w-[150px]"
+                  title={gym?.name || 'VIP Gym'}
+                >
+                  {gym?.name || 'VIP Gym'}
+                </span>
+                <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[150px]">
+                  {gym?.city ? `فرع ${gym.city}` : 'إدارة الصالات الرياضية'}
+                </span>
               </div>
             )}
           </div>
@@ -277,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className={cn(
                         'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
                         isActive
-                          ? 'bg-zinc-900 text-gym-gold font-bold shadow-xs border border-zinc-800'
+                          ? 'bg-zinc-900 text-white font-bold shadow-xs border border-zinc-800'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-900/60',
                         isCollapsed && 'justify-center px-2'
                       )}
@@ -290,7 +316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Icon
                         className={cn(
                           'w-5 h-5 shrink-0 transition-colors',
-                          isActive ? 'text-gym-gold' : 'text-zinc-400 group-hover:text-zinc-200'
+                          isActive ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200'
                         )}
                       />
 

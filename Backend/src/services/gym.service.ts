@@ -14,6 +14,7 @@ import {
 } from '../types/gym.types.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { saveBase64Image, deleteStoredImage } from '../utils/fileStorage.util.js'
 
 export const formatGymProfile = (gym: {
   id: string
@@ -115,6 +116,10 @@ export const completeGymSetup = async (
     throw AppError.notFound('بيانات الجيم غير موجودة / Gym not found')
   }
 
+  const savedLogo = input.logo
+    ? await saveBase64Image(input.logo, 'gyms', `gym-${existingGym.slug}`)
+    : null
+
   const updatedGym = await prisma.gym.update({
     where: { id: gymId },
     data: {
@@ -123,7 +128,7 @@ export const completeGymSetup = async (
       email: input.email || null,
       address: input.address || null,
       city: input.city || null,
-      logo: input.logo || null,
+      logo: savedLogo,
       currency: input.currency ?? 'EGP',
       timezone: input.timezone ?? 'Africa/Cairo',
       setupCompleted: true,
@@ -189,6 +194,25 @@ export const updateGymSettings = async (
       ? [...input.allowedFreezeDurations].sort((a, b) => a - b)
       : undefined
 
+  let finalLogo = existingGym.logo
+  if (input.logo !== undefined) {
+    if (input.logo) {
+      finalLogo = await saveBase64Image(input.logo, 'gyms', `gym-${existingGym.slug}`)
+      if (
+        existingGym.logo &&
+        existingGym.logo !== finalLogo &&
+        existingGym.logo.startsWith('/uploads/')
+      ) {
+        await deleteStoredImage(existingGym.logo)
+      }
+    } else {
+      finalLogo = null
+      if (existingGym.logo?.startsWith('/uploads/')) {
+        await deleteStoredImage(existingGym.logo)
+      }
+    }
+  }
+
   const updatedGym = await prisma.gym.update({
     where: { id: gymId },
     data: {
@@ -197,7 +221,7 @@ export const updateGymSettings = async (
       ...(input.email !== undefined && { email: input.email || null }),
       ...(input.address !== undefined && { address: input.address || null }),
       ...(input.city !== undefined && { city: input.city || null }),
-      ...(input.logo !== undefined && { logo: input.logo || null }),
+      ...(input.logo !== undefined && { logo: finalLogo }),
       ...(input.subscriptionReminderEnabled !== undefined && {
         subscriptionReminderEnabled: input.subscriptionReminderEnabled,
       }),

@@ -6,6 +6,7 @@ export interface UserDto {
   name: string
   email: string
   phone: string | null
+  avatarUrl?: string | null
   role: Role
   isActive: boolean
   lastLoginAt: Date | null

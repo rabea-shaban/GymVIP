@@ -1,21 +1,28 @@
-import type { Server } from 'http'
+import http from 'http'
 import { app } from './app.js'
 import { env } from './config/env.js'
 import { logger } from './utils/logger.util.js'
 import { disconnectDatabase } from './config/database.js'
 import { initScheduler, stopScheduler } from './jobs/scheduler.job.js'
+import { initSocketServer } from './services/socket.service.js'
 
-let server: Server | null = null
+let server: http.Server | null = null
 
 const startServer = (): void => {
   const PORT = env.PORT
 
-  server = app.listen(PORT, () => {
+  server = http.createServer(app)
+
+  // Initialize Real-time WebSockets
+  initSocketServer(server)
+
+  server.listen(PORT, () => {
     logger.info(`🚀 GymVIP SaaS Backend running on http://localhost:${PORT}`)
     logger.info(`🌍 Environment: ${env.NODE_ENV}`)
     logger.info(`🔗 API Health: http://localhost:${PORT}/api/v1/health`)
     logger.info(`🗄️  DB Health: http://localhost:${PORT}/api/v1/health/database`)
     logger.info(`🌐 Allowed Frontend Origin: ${env.FRONTEND_URL}`)
+    logger.info(`⚡ WebSockets: Online and ready`)
 
     // Start background jobs scheduler
     initScheduler()

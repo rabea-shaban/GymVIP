@@ -32,6 +32,16 @@ import { paymentsApi } from '@/features/payments/services/paymentsApi'
 import type { PaymentItem } from '@/features/payments/types/payment.types'
 import { attendanceApi } from '@/features/attendance/services/attendanceApi'
 import type { AttendanceItem } from '@/features/attendance/types/attendance.types'
+import { getMediaUrl } from '@/lib/media'
+import {
+  validateName,
+  validateEgyptianPhone,
+  validateEmail,
+  validateDateOfBirth,
+  extractBackendErrors,
+} from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
+import { useRealtimeSync } from '@/services/socket'
 
 export const MemberDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -66,6 +76,7 @@ export const MemberDetailPage: React.FC = () => {
   const [editEmergencyPhone, setEditEmergencyPhone] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editAvatarUrl, setEditAvatarUrl] = useState<string | null>(null)
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false)
   const editFileInputRef = React.useRef<HTMLInputElement | null>(null)
   const quickFileInputRef = React.useRef<HTMLInputElement | null>(null)
@@ -149,7 +160,10 @@ export const MemberDetailPage: React.FC = () => {
       setEditAvatarUrl(dataUrl)
       toast.success('تم تحديث صورة العضو بنجاح!')
     } catch (err: any) {
-      toast.error(err.message || 'فشل تحديث صورة العضو')
+      const detailedErrors = Array.isArray(err.response?.data?.errors)
+        ? err.response.data.errors.map((e: any) => e.message || `${e.field}: خطأ غير صالح`).join(' • ')
+        : null
+      toast.error(detailedErrors || err.response?.data?.message || err.message || 'فشل تحديث صورة العضو')
     } finally {
       setIsUpdatingAvatar(false)
       if (quickFileInputRef.current) {
@@ -194,7 +208,13 @@ export const MemberDetailPage: React.FC = () => {
     loadMember()
   }, [loadMember])
 
+  // Instant Real-Time WebSocket updates for Member Profile
+  useRealtimeSync(undefined, () => {
+    loadMember()
+  })
+
   const handleOpenEdit = () => {
+    setEditErrors({})
     if (memberData) {
       setEditName(memberData.name)
       setEditPhone(memberData.phone)
@@ -210,10 +230,80 @@ export const MemberDetailPage: React.FC = () => {
     setIsEditModalOpen(true)
   }
 
+  const handleEditNameChange = (val: string) => {
+    setEditName(val)
+    if (!val.trim()) {
+      setEditErrors((prev) => ({ ...prev, name: 'اسم العضو مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم العضو', 2, 100)
+      setEditErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditPhoneChange = (val: string) => {
+    setEditPhone(val)
+    if (!val.trim()) {
+      setEditErrors((prev) => ({ ...prev, phone: 'رقم الهاتف المصري مطلوب' }))
+    } else {
+      const res = validateEgyptianPhone(val, true, 'رقم الهاتف')
+      setEditErrors((prev) => ({ ...prev, phone: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditEmailChange = (val: string) => {
+    setEditEmail(val)
+    if (!val.trim()) {
+      setEditErrors((prev) => ({ ...prev, email: '' }))
+    } else {
+      const res = validateEmail(val, false)
+      setEditErrors((prev) => ({ ...prev, email: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditBirthDateChange = (val: string) => {
+    setEditBirthDate(val)
+    if (!val) {
+      setEditErrors((prev) => ({ ...prev, birthDate: '' }))
+    } else {
+      const res = validateDateOfBirth(val, false)
+      setEditErrors((prev) => ({ ...prev, birthDate: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditEmergencyPhoneChange = (val: string) => {
+    setEditEmergencyPhone(val)
+    if (!val.trim()) {
+      setEditErrors((prev) => ({ ...prev, emergencyContactPhone: '' }))
+    } else {
+      const res = validateEgyptianPhone(val, false, 'رقم هاتف الطوارئ')
+      setEditErrors((prev) => ({ ...prev, emergencyContactPhone: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editName.trim() || !editPhone.trim()) {
-      toast.error('الاسم ورقم الهاتف مطلوبان')
+    const errs: Record<string, string> = {}
+
+    const nameRes = validateName(editName, 'اسم العضو', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    const phoneRes = validateEgyptianPhone(editPhone, true, 'رقم الهاتف')
+    if (!phoneRes.isValid && phoneRes.error) errs.phone = phoneRes.error
+
+    const emailRes = validateEmail(editEmail, false)
+    if (!emailRes.isValid && emailRes.error) errs.email = emailRes.error
+
+    const birthRes = validateDateOfBirth(editBirthDate, false)
+    if (!birthRes.isValid && birthRes.error) errs.birthDate = birthRes.error
+
+    if (editEmergencyPhone.trim()) {
+      const emPhoneRes = validateEgyptianPhone(editEmergencyPhone, false, 'رقم هاتف الطوارئ')
+      if (!emPhoneRes.isValid && emPhoneRes.error) errs.emergencyContactPhone = emPhoneRes.error
+    }
+
+    setEditErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs)[0])
       return
     }
 
@@ -222,7 +312,7 @@ export const MemberDetailPage: React.FC = () => {
       const targetId = memberData?.id || id || ''
       const updated = await membersApi.update(targetId, {
         name: editName.trim(),
-        phone: editPhone.trim(),
+        phone: phoneRes.normalized || editPhone.trim(),
         email: editEmail.trim() || null,
         gender: (editGender as 'MALE' | 'FEMALE') || null,
         dateOfBirth: editBirthDate || null,
@@ -236,7 +326,11 @@ export const MemberDetailPage: React.FC = () => {
       setIsEditModalOpen(false)
       toast.success('تم تحديث بيانات العضو بنجاح')
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'فشل تحديث بيانات العضو')
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setEditErrors(backendErrors)
+      }
+      toast.error(generalMessage || 'فشل تحديث بيانات العضو')
     } finally {
       setIsSaving(false)
     }
@@ -597,9 +691,9 @@ export const MemberDetailPage: React.FC = () => {
                   onChange={handleQuickAvatarChange}
                 />
                 <div className="relative group shrink-0">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-zinc-950 text-gym-gold border-2 border-gym-gold flex items-center justify-center font-black text-2xl sm:text-3xl shadow-md shrink-0 overflow-hidden">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-zinc-950 text-white border-2 border-zinc-700 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-md shrink-0 overflow-hidden">
                     {memberData?.avatarUrl ? (
-                      <img src={memberData.avatarUrl} alt={memberName} className="w-full h-full object-cover" />
+                      <img src={getMediaUrl(memberData.avatarUrl)} alt={memberName} className="w-full h-full object-cover" />
                     ) : (
                       <span>{avatarLetters}</span>
                     )}
@@ -640,7 +734,7 @@ export const MemberDetailPage: React.FC = () => {
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
                       {statusConfig.statusText}
                     </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-900 text-gym-gold border border-gym-gold/40">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-900 text-white border border-zinc-700">
                       <Award className="w-3 h-3" />
                       {currentSub ? currentSub.planName : 'بدون باقة'}
                     </span>
@@ -1434,8 +1528,8 @@ export const MemberDetailPage: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-zinc-900 text-gym-gold flex items-center justify-center">
-                  <QrCode className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center">
+                  <QrCode className="w-4 h-4 text-white" />
                 </div>
                 <h3 className="text-base font-bold text-zinc-900">تسجيل حضور يدوي فوري</h3>
               </div>
@@ -1491,8 +1585,8 @@ export const MemberDetailPage: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-zinc-100 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-zinc-900 text-gym-gold flex items-center justify-center">
-                  <Edit className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center">
+                  <Edit className="w-4 h-4 text-white" />
                 </div>
                 <h3 className="text-base font-bold text-zinc-900">تعديل بيانات العضو</h3>
               </div>
@@ -1516,9 +1610,9 @@ export const MemberDetailPage: React.FC = () => {
               {/* Photo Upload & Preview in Edit Modal */}
               <div className="p-3.5 bg-zinc-50 rounded-2xl border border-zinc-200/90 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-zinc-950 text-gym-gold border border-gym-gold/40 flex items-center justify-center font-black text-lg overflow-hidden shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-zinc-950 text-white border border-zinc-700 flex items-center justify-center font-black text-lg overflow-hidden shrink-0">
                     {editAvatarUrl ? (
-                      <img src={editAvatarUrl} alt="صورة العضو" className="w-full h-full object-cover" />
+                      <img src={getMediaUrl(editAvatarUrl)} alt="صورة العضو" className="w-full h-full object-cover" />
                     ) : (
                       <span>{avatarLetters}</span>
                     )}
@@ -1571,9 +1665,13 @@ export const MemberDetailPage: React.FC = () => {
                   type="text"
                   required
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl font-bold focus:bg-white focus:outline-none focus:border-zinc-900"
+                  onChange={(e) => handleEditNameChange(e.target.value)}
+                  className={cn(
+                    'w-full px-3 py-2 bg-zinc-50 border rounded-xl font-bold focus:bg-white focus:outline-none',
+                    editErrors.name ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                  )}
                 />
+                <FieldError error={editErrors.name} />
               </div>
 
               <div>
@@ -1582,10 +1680,14 @@ export const MemberDetailPage: React.FC = () => {
                   type="text"
                   required
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
+                  onChange={(e) => handleEditPhoneChange(e.target.value)}
                   placeholder="01012345678"
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl font-mono font-bold focus:bg-white focus:outline-none focus:border-zinc-900 dir-ltr text-right"
+                  className={cn(
+                    'w-full px-3 py-2 bg-zinc-50 border rounded-xl font-mono font-bold focus:bg-white focus:outline-none dir-ltr text-right',
+                    editErrors.phone ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                  )}
                 />
+                <FieldError error={editErrors.phone} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1594,9 +1696,13 @@ export const MemberDetailPage: React.FC = () => {
                   <input
                     type="email"
                     value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:border-zinc-900"
+                    onChange={(e) => handleEditEmailChange(e.target.value)}
+                    className={cn(
+                      'w-full px-3 py-2 bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none',
+                      editErrors.email ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                   />
+                  <FieldError error={editErrors.email} />
                 </div>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">النوع</label>
@@ -1618,9 +1724,13 @@ export const MemberDetailPage: React.FC = () => {
                   <input
                     type="date"
                     value={editBirthDate}
-                    onChange={(e) => setEditBirthDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:border-zinc-900"
+                    onChange={(e) => handleEditBirthDateChange(e.target.value)}
+                    className={cn(
+                      'w-full px-3 py-2 bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none',
+                      editErrors.birthDate ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                   />
+                  <FieldError error={editErrors.birthDate} />
                 </div>
                 <div>
                   <label className="block font-bold text-zinc-700 mb-1">العنوان</label>
@@ -1648,10 +1758,14 @@ export const MemberDetailPage: React.FC = () => {
                   <input
                     type="text"
                     value={editEmergencyPhone}
-                    onChange={(e) => setEditEmergencyPhone(e.target.value)}
+                    onChange={(e) => handleEditEmergencyPhoneChange(e.target.value)}
                     placeholder="01112345678"
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl font-mono dir-ltr text-right focus:bg-white"
+                    className={cn(
+                      'w-full px-3 py-2 bg-zinc-50 border rounded-xl font-mono dir-ltr text-right focus:bg-white',
+                      editErrors.emergencyContactPhone ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                    )}
                   />
+                  <FieldError error={editErrors.emergencyContactPhone} />
                 </div>
               </div>
 

@@ -301,7 +301,6 @@ export const GymSetupWizardPage: React.FC = () => {
               <h2 className="text-2xl sm:text-3xl font-black font-cairo text-zinc-950 tracking-tight">
                 خلينا نجهز جيمك
               </h2>
-              <span className="text-2xl">👋</span>
             </div>
             <p className="text-xs sm:text-sm text-zinc-500 font-body">
               أدخل بعض البيانات الأساسية لنبدأ إعداد GymVIP لجيمك بكل سلاسة واحترافية.
@@ -356,8 +355,7 @@ export const GymSetupWizardPage: React.FC = () => {
                   رقم هاتف الجيم <span className="text-red-500">*</span>
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute right-2 flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-50 border border-zinc-200 text-xs text-zinc-700 font-semibold select-none">
-                    <span className="text-sm">🇪🇬</span>
+                  <div className="absolute right-2 flex items-center gap-1 px-2 py-1 rounded bg-zinc-50 border border-zinc-200 text-xs text-zinc-700 font-semibold select-none">
                     <span dir="ltr">20+</span>
                   </div>
                   <input

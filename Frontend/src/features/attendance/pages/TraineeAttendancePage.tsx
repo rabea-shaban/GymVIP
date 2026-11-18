@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Users,
@@ -8,8 +9,6 @@ import {
   Search,
   ChevronLeft,
   X,
-  Phone,
-  MessageCircle,
   QrCode,
   Building,
   Flame,
@@ -17,13 +16,85 @@ import {
   Loader2,
   UserCheck,
   LogOut,
-  Maximize2
+  Maximize2,
 } from 'lucide-react'
+import { Avatar } from '@/components/ui/Avatar'
 import { attendanceApi } from '../services/attendanceApi'
 import { membersApi } from '@/features/members/services/membersApi'
 import { ExportDropdown } from '@/components/ui/ExportDropdown'
-import type { AttendanceItem } from '../types/attendance.types'
+import type { AttendanceItem, TodayAttendanceSummary } from '../types/attendance.types'
 import type { MemberItem } from '@/features/members/types/member.types'
+import { useRealtimeSync } from '@/services/socket'
+
+// Real SVG Icons
+const WhatsAppSvg: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.888 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+  </svg>
+)
+
+const PhoneCallSvg: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+)
+
+const formatWhatsAppUrl = (phone?: string | null) => {
+  if (!phone) return '#'
+  let cleaned = phone.replace(/[^0-9]/g, '')
+  if (cleaned.startsWith('0')) {
+    cleaned = '2' + cleaned
+  } else if (!cleaned.startsWith('20') && cleaned.length === 10) {
+    cleaned = '20' + cleaned
+  }
+  return `https://wa.me/${cleaned}`
+}
+
+const formatDateClean = (dateStr?: string | null | Date) => {
+  if (!dateStr) return '—'
+  try {
+    const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
+    if (isNaN(d.getTime())) return '—'
+    return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(d)
+  } catch {
+    return '—'
+  }
+}
+
+const formatTimeClean = (dateStr?: string | null) => {
+  if (!dateStr) return '—'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(d)
+  } catch {
+    return '—'
+  }
+}
 
 export const TraineeAttendancePage: React.FC = () => {
   const navigate = useNavigate()
@@ -31,6 +102,7 @@ export const TraineeAttendancePage: React.FC = () => {
   // Real Data States
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceItem[]>([])
   const [liveAttendees, setLiveAttendees] = useState<AttendanceItem[]>([])
+  const [todaySummary, setTodaySummary] = useState<TodayAttendanceSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // Filter States
@@ -45,8 +117,10 @@ export const TraineeAttendancePage: React.FC = () => {
   const [checkInModalOpen, setCheckInModalOpen] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberSearchResults, setMemberSearchResults] = useState<MemberItem[]>([])
+  const [quickMembers, setQuickMembers] = useState<MemberItem[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberItem | null>(null)
   const [isSearchingMember, setIsSearchingMember] = useState(false)
+  const [isLoadingQuickMembers, setIsLoadingQuickMembers] = useState(false)
   const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false)
 
   // Toast
@@ -63,13 +137,18 @@ export const TraineeAttendancePage: React.FC = () => {
   const loadAttendance = useCallback(async () => {
     try {
       setIsLoading(true)
-      const [listRes, insideRes] = await Promise.all([
-        attendanceApi.list({ limit: 50 }).catch(() => ({ attendance: [] })),
+      const [listRes, insideRes, summaryRes] = await Promise.all([
+        attendanceApi.list({ limit: 50 }).catch(() => ({
+          attendance: [],
+          pagination: { page: 1, limit: 50, total: 0, totalPages: 1 },
+        })),
         attendanceApi.getCurrentlyInside().catch(() => []),
+        attendanceApi.getTodaySummary().catch(() => null),
       ])
 
       setAttendanceRecords(listRes.attendance || [])
       setLiveAttendees(insideRes || [])
+      if (summaryRes) setTodaySummary(summaryRes)
     } catch {
       triggerToast('تعذر تحميل سجلات الحضور', 'error')
     } finally {
@@ -83,9 +162,33 @@ export const TraineeAttendancePage: React.FC = () => {
     return () => clearInterval(interval)
   }, [loadAttendance])
 
+  // Instant Real-Time WebSocket sync for Trainee Attendance
+  useRealtimeSync(undefined, () => {
+    loadAttendance()
+  })
+
+  // Load Quick Members for Modal
+  const loadQuickMembers = useCallback(async () => {
+    try {
+      setIsLoadingQuickMembers(true)
+      const res = await membersApi.list({ limit: 12, status: 'active' })
+      setQuickMembers(res.members || [])
+    } catch {
+      // fallback
+    } finally {
+      setIsLoadingQuickMembers(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (checkInModalOpen) {
+      loadQuickMembers()
+    }
+  }, [checkInModalOpen, loadQuickMembers])
+
   // Search Members for Check-in
   useEffect(() => {
-    if (!memberSearchQuery.trim() || memberSearchQuery.length < 2) {
+    if (!memberSearchQuery.trim()) {
       setMemberSearchResults([])
       return
     }
@@ -93,14 +196,14 @@ export const TraineeAttendancePage: React.FC = () => {
     const timer = setTimeout(async () => {
       try {
         setIsSearchingMember(true)
-        const res = await membersApi.list({ search: memberSearchQuery, limit: 5 })
-        setMemberSearchResults(res.members)
+        const res = await membersApi.list({ search: memberSearchQuery.trim(), limit: 8 })
+        setMemberSearchResults(res.members || [])
       } catch {
         setMemberSearchResults([])
       } finally {
         setIsSearchingMember(false)
       }
-    }, 300)
+    }, 250)
 
     return () => clearTimeout(timer)
   }, [memberSearchQuery])
@@ -162,16 +265,13 @@ export const TraineeAttendancePage: React.FC = () => {
   }, [attendanceRecords, searchQuery, statusFilter])
 
   // KPIs
-  const insideCount = liveAttendees.length
-  const completedCount = attendanceRecords.filter((r) => r.checkOutAt).length
-  const totalToday = attendanceRecords.length
+  const insideCount = todaySummary ? todaySummary.currentlyInside : liveAttendees.length
+  const completedCount = todaySummary
+    ? todaySummary.checkedOutToday
+    : attendanceRecords.filter((r) => r.checkOutAt).length
+  const totalToday = todaySummary ? todaySummary.totalCheckInsToday : attendanceRecords.length
 
-  const currentDateFormatted = new Date().toLocaleDateString('ar-EG', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const currentDateFormatted = formatDateClean(new Date())
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16 font-cairo" dir="rtl">
@@ -419,17 +519,8 @@ export const TraineeAttendancePage: React.FC = () => {
               <tbody className="divide-y divide-zinc-200/60">
                 {filteredRecords.map((item) => {
                   const isInside = !item.checkOutAt
-                  const initials = (item.member?.name || 'م').slice(0, 2)
-                  const checkInTime = new Date(item.checkInAt).toLocaleTimeString('ar-EG', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                  const checkOutTime = item.checkOutAt
-                    ? new Date(item.checkOutAt).toLocaleTimeString('ar-EG', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : '—'
+                  const checkInTime = formatTimeClean(item.checkInAt)
+                  const checkOutTime = item.checkOutAt ? formatTimeClean(item.checkOutAt) : '—'
                   const durationStr = item.durationMinutes
                     ? `${Math.floor(item.durationMinutes / 60)}س ${item.durationMinutes % 60}د`
                     : isInside
@@ -443,13 +534,12 @@ export const TraineeAttendancePage: React.FC = () => {
                     >
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none ${
-                              isInside ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'
-                            }`}
-                          >
-                            {initials}
-                          </div>
+                          <Avatar
+                            src={item.member?.avatarUrl || undefined}
+                            name={item.member?.name || 'عضو'}
+                            size="sm"
+                            className="border border-zinc-200 shadow-2xs shrink-0"
+                          />
                           <div>
                             <div className="font-extrabold text-zinc-900 text-sm flex items-center gap-2">
                               <span>{item.member?.name || 'عضو'}</span>
@@ -529,15 +619,18 @@ export const TraineeAttendancePage: React.FC = () => {
       </div>
 
       {/* Trainee Details Drawer */}
-      {drawerOpen && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-2xs animate-in fade-in">
+      {drawerOpen && selectedRecord && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-end bg-black/60 backdrop-blur-2xs animate-in fade-in">
           <div className="bg-white h-full max-w-md w-full p-6 shadow-2xl overflow-y-auto space-y-6 text-right flex flex-col justify-between animate-in slide-in-from-left">
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-zinc-950 text-white flex items-center justify-center font-bold text-base">
-                    {(selectedRecord.member?.name || 'م').slice(0, 2)}
-                  </div>
+                  <Avatar
+                    src={selectedRecord.member?.avatarUrl || undefined}
+                    name={selectedRecord.member?.name || 'عضو'}
+                    size="lg"
+                    className="w-12 h-12 ring-2 ring-emerald-500/20 shadow-xs shrink-0"
+                  />
                   <div>
                     <h3 className="text-lg font-black text-zinc-950">
                       {selectedRecord.member?.name}
@@ -570,20 +663,14 @@ export const TraineeAttendancePage: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-zinc-500">وقت تسجيل الدخول:</span>
                     <span className="font-bold text-zinc-900">
-                      {new Date(selectedRecord.checkInAt).toLocaleTimeString('ar-EG', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatTimeClean(selectedRecord.checkInAt)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">وقت تسجيل الخروج:</span>
                     <span className="font-bold text-zinc-900">
                       {selectedRecord.checkOutAt
-                        ? new Date(selectedRecord.checkOutAt).toLocaleTimeString('ar-EG', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                        ? formatTimeClean(selectedRecord.checkOutAt)
                         : 'متواجد حالياً بالصالة'}
                     </span>
                   </div>
@@ -605,18 +692,18 @@ export const TraineeAttendancePage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <a
                       href={`tel:${selectedRecord.member.phone}`}
-                      className="flex items-center justify-center gap-2 p-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl font-bold transition"
+                      className="flex items-center justify-center gap-2 p-2.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-bold transition"
                     >
-                      <Phone className="w-4 h-4" />
+                      <PhoneCallSvg className="w-4 h-4 text-white" />
                       <span>اتصال</span>
                     </a>
                     <a
-                      href={`https://wa.me/2${selectedRecord.member.phone}`}
+                      href={formatWhatsAppUrl(selectedRecord.member.phone)}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-center gap-2 p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition"
+                      className="flex items-center justify-center gap-2 p-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-bold transition"
                     >
-                      <MessageCircle className="w-4 h-4" />
+                      <WhatsAppSvg className="w-4 h-4 fill-white" />
                       <span>واتساب</span>
                     </a>
                   </div>
@@ -654,92 +741,287 @@ export const TraineeAttendancePage: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Quick Check-in Modal */}
-      {checkInModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 space-y-4 text-right animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
-                  <QrCode className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-zinc-950">تسجيل حضور فوري للمتدرب</h3>
-                  <div className="text-xs text-zinc-500">ابحث باسم المتدرب أو الكود أو الهاتف</div>
-                </div>
-              </div>
-              <button
-                onClick={() => setCheckInModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-zinc-800">
-                ابحث عن المتدرب
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="ابحث هنا..."
-                  value={memberSearchQuery}
-                  onChange={(e) => {
-                    setMemberSearchQuery(e.target.value)
-                    if (selectedMember) setSelectedMember(null)
-                  }}
-                  className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-gym-gold/20"
-                />
-                {isSearchingMember && (
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+      {checkInModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-zinc-200 space-y-4 text-right animate-in zoom-in-95 max-h-[90vh] flex flex-col justify-between">
+            {/* Modal Header */}
+            <div>
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
+                    <QrCode className="w-5 h-5 text-amber-700" />
                   </div>
-                )}
+                  <div>
+                    <h3 className="text-base font-black text-zinc-950">تسجيل حضور فوري للمتدرب</h3>
+                    <div className="text-xs text-zinc-500">اختر متدرباً أو ابحث بالاسم، الهاتف أو كود العضوية</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckInModalOpen(false)}
+                  className="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Autocomplete Results */}
-              {memberSearchResults.length > 0 && !selectedMember && (
-                <div className="border border-zinc-200 rounded-xl bg-white shadow-lg overflow-hidden divide-y divide-zinc-100 max-h-48 overflow-y-auto">
-                  {memberSearchResults.map((m) => (
+              {/* Search Bar */}
+              <div className="mt-4 space-y-2">
+                <label className="block text-xs font-bold text-zinc-800">
+                  بحث عن متدرب
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="ابحث بالاسم، رقم الهاتف أو كود العضوية (مثال: GYM-000001)..."
+                    value={memberSearchQuery}
+                    onChange={(e) => {
+                      setMemberSearchQuery(e.target.value)
+                      if (selectedMember) setSelectedMember(null)
+                    }}
+                    className="w-full pl-9 pr-10 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs sm:text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-gym-gold/20 focus:bg-white transition"
+                    autoFocus
+                  />
+                  <Search className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                  {isSearchingMember ? (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+                    </div>
+                  ) : memberSearchQuery ? (
                     <button
-                      key={m.id}
                       type="button"
                       onClick={() => {
-                        setSelectedMember(m)
-                        setMemberSearchQuery(`${m.name} (${m.memberCode})`)
+                        setMemberSearchQuery('')
                         setMemberSearchResults([])
                       }}
-                      className="w-full p-2.5 text-right hover:bg-amber-50 flex items-center justify-between transition"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
                     >
-                      <div>
-                        <div className="text-xs font-bold text-zinc-900">{m.name}</div>
-                        <div className="text-[10px] text-zinc-400 font-mono">{m.phone}</div>
-                      </div>
-                      <span className="text-[11px] font-mono bg-zinc-100 px-2 py-0.5 rounded text-zinc-600">
-                        {m.memberCode}
-                      </span>
+                      <X className="w-4 h-4" />
                     </button>
-                  ))}
+                  ) : null}
                 </div>
-              )}
+              </div>
+            </div>
 
-              {selectedMember && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold">
-                  <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>تم تحديد المتدرب: {selectedMember.name}</span>
+            {/* Modal Body / Results / Selection */}
+            <div className="flex-1 overflow-y-auto max-h-72 space-y-3 py-1 pr-0.5">
+              {/* If a Member is Selected */}
+              {selectedMember ? (
+                <div className="p-4 bg-amber-50/60 border border-amber-200/90 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={selectedMember.avatarUrl || undefined}
+                        name={selectedMember.name}
+                        size="md"
+                        className="w-12 h-12 border-2 border-gym-gold shadow-xs shrink-0"
+                      />
+                      <div>
+                        <div className="text-sm font-black text-zinc-950 flex items-center gap-1.5">
+                          <UserCheck className="w-4 h-4 text-emerald-600" />
+                          <span>{selectedMember.name}</span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                            {selectedMember.isActive ? 'نشط' : 'غير نشط'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mt-0.5">
+                          <span className="bg-zinc-200 px-1.5 py-0.5 rounded font-bold text-zinc-800">
+                            {selectedMember.memberCode}
+                          </span>
+                          <span dir="ltr">{selectedMember.phone}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMember(null)
+                        setMemberSearchQuery('')
+                      }}
+                      className="text-xs font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition"
+                    >
+                      تغيير
+                    </button>
+                  </div>
+
+                  {/* Active Presence Warning if already inside */}
+                  {liveAttendees.some(
+                    (att) => att.member?.id === selectedMember.id || att.memberId === selectedMember.id
+                  ) && (
+                    <div className="p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl flex items-center gap-2 text-amber-900 text-xs font-bold">
+                      <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>تنبيه: هذا المتدرب مسجل حضوره حالياً داخل الصالة الرياضية!</span>
+                    </div>
+                  )}
+                </div>
+              ) : memberSearchQuery.trim().length >= 1 ? (
+                /* Search Results or No Results */
+                memberSearchResults.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-bold text-zinc-500">نتائج البحث ({memberSearchResults.length}):</span>
+                    <div className="border border-zinc-200 rounded-xl bg-white shadow-xs overflow-hidden divide-y divide-zinc-100">
+                      {memberSearchResults.map((m) => {
+                        const isInside = liveAttendees.some(
+                          (att) => att.member?.id === m.id || att.memberId === m.id
+                        )
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedMember(m)
+                              setMemberSearchResults([])
+                            }}
+                            className="w-full p-3 text-right hover:bg-amber-50/70 flex items-center justify-between transition group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar
+                                src={m.avatarUrl || undefined}
+                                name={m.name}
+                                size="sm"
+                                className="w-9 h-9 border border-zinc-200"
+                              />
+                              <div>
+                                <div className="text-xs font-extrabold text-zinc-900 group-hover:text-amber-900 flex items-center gap-1.5">
+                                  <span>{m.name}</span>
+                                  {isInside && (
+                                    <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                                      بالصالة
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-zinc-400 font-mono mt-0.5" dir="ltr">
+                                  {m.phone}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-mono font-bold bg-zinc-100 px-2 py-1 rounded text-zinc-700">
+                              {m.memberCode}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : !isSearchingMember ? (
+                  <div className="space-y-3">
+                    {memberSearchQuery.trim().toUpperCase().startsWith('TR') && (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 font-bold flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span>تنبيه: الكود المدخل ({memberSearchQuery}) يخص مدرباً وليس متدرباً. أكواد المتدربين تبدأ بـ GYM- (مثال: GYM-000001).</span>
+                      </div>
+                    )}
+                    <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl text-center space-y-1.5">
+                      <Users className="w-7 h-7 text-zinc-400 mx-auto" />
+                      <p className="text-xs font-bold text-zinc-700">
+                        لم يتم العثور على متدرب يطابق "{memberSearchQuery}"
+                      </p>
+                      <p className="text-[11px] text-zinc-500">
+                        تأكد من كتابة اسم المتدرب أو رقم هاتفه أو كود العضوية (مثال: GYM-000001).
+                      </p>
+                    </div>
+
+                    {/* Keep quick members visible below so user doesn't get stuck */}
+                    {quickMembers.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-bold text-zinc-500">أو اختر من المتدربين المتاحين:</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                          {quickMembers.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMember(m)
+                                setMemberSearchQuery('')
+                              }}
+                              className="p-2 rounded-xl border border-zinc-200 hover:border-amber-400 hover:bg-amber-50/50 bg-white text-right flex items-center justify-between transition group shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <Avatar
+                                  src={m.avatarUrl || undefined}
+                                  name={m.name}
+                                  size="sm"
+                                  className="w-7 h-7 border border-zinc-200 shrink-0"
+                                />
+                                <div className="truncate">
+                                  <div className="text-xs font-bold text-zinc-900 truncate">
+                                    {m.name}
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400 font-mono truncate">
+                                    {m.memberCode}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null
+              ) : (
+                /* Default: Quick Trainees / Active Members */
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-zinc-500 font-bold">
+                    <span>المتدربون المتاحون (اختيار فوري بنقرة واحدة):</span>
+                    {isLoadingQuickMembers && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  </div>
+                  {quickMembers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {quickMembers.map((m) => {
+                        const isInside = liveAttendees.some(
+                          (att) => att.member?.id === m.id || att.memberId === m.id
+                        )
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setSelectedMember(m)}
+                            className="p-2.5 rounded-xl border border-zinc-200 hover:border-amber-400 hover:bg-amber-50/50 bg-white text-right flex items-center justify-between transition group shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Avatar
+                                src={m.avatarUrl || undefined}
+                                name={m.name}
+                                size="sm"
+                                className="w-8 h-8 border border-zinc-200 shrink-0"
+                              />
+                              <div className="truncate">
+                                <div className="text-xs font-bold text-zinc-900 group-hover:text-amber-950 truncate">
+                                  {m.name}
+                                </div>
+                                <div className="text-[10px] text-zinc-400 font-mono truncate">
+                                  {m.memberCode}
+                                </div>
+                              </div>
+                            </div>
+                            {isInside ? (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" title="داخل الصالة" />
+                            ) : null}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-xs text-zinc-400">
+                      لا يوجد أعضاء نشطون حالياً
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-100">
               <button
                 type="button"
                 onClick={() => setCheckInModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100"
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-100 transition"
               >
                 إلغاء
               </button>
@@ -747,14 +1029,19 @@ export const TraineeAttendancePage: React.FC = () => {
                 type="button"
                 disabled={!selectedMember || isSubmittingCheckIn}
                 onClick={handleConfirmCheckIn}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#F5D86B] text-zinc-950 hover:bg-[#ECCB50] disabled:opacity-50 flex items-center gap-1.5"
+                className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition ${
+                  !selectedMember || isSubmittingCheckIn
+                    ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed border border-transparent'
+                    : 'bg-[#F5D86B] hover:bg-[#ECCB50] text-zinc-950 font-black shadow-md cursor-pointer border border-[#E5C652]'
+                }`}
               >
                 {isSubmittingCheckIn && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>تأكيد تسجيل الحضور</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

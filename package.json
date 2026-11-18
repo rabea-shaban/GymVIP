@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "GymVIP SaaS - Root Orchestrator",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"cyan,yellow\" \"npm run dev --prefix Backend\" \"npm run dev --prefix Frontend\"",
-    "dev:backend": "npm run dev --prefix Backend",
+    "dev": "concurrently -k -n \"DATABASE,BACKEND,FRONTEND\" -c \"magenta,cyan,yellow\" \"node scripts/start-database.js\" \"npm run dev --prefix Backend\" \"npm run dev --prefix Frontend\"",
+    "dev:backend": "concurrently -k -n \"DATABASE,BACKEND\" -c \"magenta,cyan\" \"node scripts/start-database.js\" \"npm run dev --prefix Backend\"",
     "dev:frontend": "npm run dev --prefix Frontend",
     "build": "npm run build --prefix Backend && npm run build --prefix Frontend",
     "build:backend": "npm run build --prefix Backend",

@@ -23,6 +23,7 @@ import { useToast } from '@/components/feedback/Toast'
 import { plansApi } from '@/features/plans/services/plansApi'
 import { ExportDropdown } from '@/components/ui/ExportDropdown'
 import type { PlanItem as BackendPlanItem } from '@/features/plans/types/plan.types'
+import { useRealtimeSync } from '@/services/socket'
 
 export type PlansViewState =
   | 'default'               // الافتراضية (البيانات)
@@ -114,6 +115,11 @@ export const PlansListPage: React.FC = () => {
   useEffect(() => {
     loadPlans()
   }, [loadPlans])
+
+  // Instant Real-Time WebSocket updates for Plans List
+  useRealtimeSync(undefined, () => {
+    loadPlans()
+  })
 
   // Filtered & Sorted Plans
   const filteredPlans = useMemo(() => {
@@ -507,8 +513,8 @@ export const PlansListPage: React.FC = () => {
                       )}
 
                       {isVipCard && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-zinc-950 text-gym-gold border border-gym-gold/40 shadow-xs">
-                          <Award className="w-3 h-3 text-gym-gold" />
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-zinc-950 text-white border border-zinc-700 shadow-xs">
+                          <Award className="w-3 h-3 text-white" />
                           باقة VIP السنوية
                         </span>
                       )}
@@ -704,7 +710,7 @@ export const PlansListPage: React.FC = () => {
               <strong className="text-amber-700 font-bold">{selectedPlanForAction.activeMembersCount} عضو نشط</strong> في قاعدة البيانات.
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 mb-6">
-              💡 للحفاظ على سلامة القيود المالية وسجلات المشتركين، يمكنك <strong>تعطيل الباقة</strong> بدلاً من حذفها لمنع اختيارها للمشتركين الجدد.
+              ملاحظة: للحفاظ على سلامة القيود المالية وسجلات المشتركين، يمكنك <strong>تعطيل الباقة</strong> بدلاً من حذفها لمنع اختيارها للمشتركين الجدد.
             </div>
             <div className="flex items-center gap-3">
               <button

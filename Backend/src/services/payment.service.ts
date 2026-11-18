@@ -12,6 +12,7 @@ import type {
 } from '../types/payment.types.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 
 export function formatPaymentDto(
   payment: any,
@@ -222,6 +223,13 @@ export async function createPayment(
     entityId: paymentDto.id,
     description: `تم تسجيل دفعة مالية بقيمة (${paymentDto.amount} ${paymentDto.currency}) للعضو (${paymentDto.member?.name || 'العضو'})`,
     afterData: paymentDto,
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.PAYMENT_CREATED, {
+    payment: paymentDto,
+    memberId: paymentDto.memberId,
+    amount: paymentDto.amount,
   })
 
   return paymentDto

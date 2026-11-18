@@ -46,6 +46,20 @@ import ProfilePage from '@/features/settings/pages/ProfilePage'
 import NotFoundPage from '@/pages/errors/NotFoundPage'
 import ForbiddenPage from '@/pages/errors/ForbiddenPage'
 import ServerErrorPage from '@/pages/errors/ServerErrorPage'
+import UnauthorizedPage from '@/pages/errors/UnauthorizedPage'
+
+import { useAuth } from '@/features/auth/context/AuthContext'
+
+const RoleBasedDashboardRouter: React.FC = () => {
+  const { user } = useAuth()
+  if (user?.role === 'TRAINER') {
+    return <Navigate to="/app/trainer/dashboard" replace />
+  }
+  if (user?.role === 'RECEPTIONIST') {
+    return <Navigate to="/app/reception/dashboard" replace />
+  }
+  return <DashboardPage />
+}
 
 export const routes: RouteObject[] = [
   // Root Redirect to Login
@@ -96,41 +110,69 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: <Navigate to="/app/dashboard" replace />,
+        element: <RoleBasedDashboardRouter />,
       },
       {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: <RoleBasedDashboardRouter />,
       },
       {
         path: 'reception/dashboard',
-        element: <ReceptionDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <ReceptionDashboardPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'reception',
-        element: <ReceptionDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <ReceptionDashboardPage />
+          </ProtectedRoute>
+        ),
       },
       // Setup Wizard inside App Shell
       {
         path: 'setup',
-        element: <GymSetupWizardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER']}>
+            <GymSetupWizardPage />
+          </ProtectedRoute>
+        ),
       },
       // Members
       {
         path: 'members',
-        element: <MembersListPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <MembersListPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'members/search',
-        element: <MemberSearchPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <MemberSearchPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'search',
-        element: <MemberSearchPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <MemberSearchPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'members/new',
-        element: <MemberCreatePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <MemberCreatePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'members/:id',
@@ -164,23 +206,43 @@ export const routes: RouteObject[] = [
       // Subscriptions
       {
         path: 'subscriptions',
-        element: <SubscriptionsListPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <SubscriptionsListPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'subscriptions/new',
-        element: <SubscriptionCreatePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <SubscriptionCreatePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'subscriptions/:id',
-        element: <SubscriptionDetailPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <SubscriptionDetailPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'subscriptions/:id/renew',
-        element: <SubscriptionRenewPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <SubscriptionRenewPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'subscriptions/renew',
-        element: <SubscriptionRenewPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <SubscriptionRenewPage />
+          </ProtectedRoute>
+        ),
       },
       // Payments
       {
@@ -210,40 +272,76 @@ export const routes: RouteObject[] = [
       // Attendance
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <AttendancePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'attendance/trainees',
-        element: <TraineeAttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TraineeAttendancePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainees/attendance',
-        element: <TraineeAttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TraineeAttendancePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainer/attendance',
-        element: <TraineeAttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TraineeAttendancePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainer/dashboard',
-        element: <TrainerDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TrainerDashboardPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainer/trainees',
-        element: <TrainerTraineesPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TrainerTraineesPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainees',
-        element: <TrainerTraineesPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TrainerTraineesPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainer',
-        element: <TrainerDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'TRAINER']}>
+            <TrainerDashboardPage />
+          </ProtectedRoute>
+        ),
       },
       // Trainers
       {
         path: 'trainers',
-        element: <TrainersListPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <TrainersListPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'trainers/new',
@@ -255,7 +353,11 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'trainers/:id',
-        element: <TrainerDetailPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'RECEPTIONIST']}>
+            <TrainerDetailPage />
+          </ProtectedRoute>
+        ),
       },
       // Reports
       {
@@ -302,12 +404,21 @@ export const routes: RouteObject[] = [
         path: 'profile',
         element: <ProfilePage />,
       },
+      // In-App Unauthorized Page (maintains sidebar & header layout)
+      {
+        path: 'unauthorized',
+        element: <UnauthorizedPage />,
+      },
     ],
   },
 
   // Standalone Error Pages
   {
     path: '/403',
+    element: <ForbiddenPage />,
+  },
+  {
+    path: '/unauthorized',
     element: <ForbiddenPage />,
   },
   {

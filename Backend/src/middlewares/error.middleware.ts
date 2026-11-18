@@ -84,7 +84,7 @@ export const errorHandler: ErrorRequestHandler = (
     sendError(
       res,
       503,
-      'تعذر الاتصال بقاعدة البيانات حالياً / Database service unavailable',
+      'خدمة قاعدة البيانات غير متاحة (MySQL). يرجى التأكد من تشغيل MySQL في XAMPP / Database service unavailable',
       env.NODE_ENV !== 'production' ? [{ details: err.message }] : undefined
     )
     return

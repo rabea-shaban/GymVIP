@@ -26,7 +26,7 @@ model Gym {
   email          String?
   address        String?
   city           String?
-  logo           String?
+  logo           String?  @db.MediumText
   currency       String   @default("EGP")
   timezone       String   @default("Africa/Cairo")
   isActive       Boolean  @default(true)
@@ -64,6 +64,7 @@ model User {
   name         String
   email        String
   phone        String?
+  avatarUrl    String?   @db.MediumText
   passwordHash String
   role         Role      @default(OWNER)
   isActive     Boolean   @default(true)

@@ -146,7 +146,7 @@ export const NotFoundPage: React.FC<ErrorPageProps> = ({ initialType = '404' }) 
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm">🇪🇬</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-gym-gold" />
               <span>متوافق مع الفاتورة الإلكترونية المصرية</span>
             </div>
             <div className="flex items-center gap-1.5">

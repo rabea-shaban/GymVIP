@@ -13,6 +13,7 @@ import type {
 } from '../validators/trainer.validator.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 
 export const formatTrainerDto = (trainer: {
   id: string
@@ -27,6 +28,7 @@ export const formatTrainerDto = (trainer: {
     name: string
     email: string
     phone: string | null
+    avatarUrl?: string | null
     isActive: boolean
   }
 }): TrainerDto => ({
@@ -42,6 +44,7 @@ export const formatTrainerDto = (trainer: {
     name: trainer.user.name,
     email: trainer.user.email,
     phone: trainer.user.phone,
+    avatarUrl: (trainer.user as any).avatarUrl || null,
     isActive: trainer.user.isActive,
   },
 })
@@ -99,6 +102,7 @@ export const createTrainer = async (
             name: true,
             email: true,
             phone: true,
+            avatarUrl: true,
             isActive: true,
           },
         },
@@ -118,6 +122,11 @@ export const createTrainer = async (
     entityId: dto.id,
     description: `تم إضافة مدرب جديد (${dto.user.name})`,
     afterData: dto,
+  })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.TRAINER_UPDATED, {
+    trainerId: dto.id,
+    action: 'created',
   })
 
   return dto
@@ -165,6 +174,7 @@ export const getTrainersList = async (
             name: true,
             email: true,
             phone: true,
+            avatarUrl: true,
             isActive: true,
           },
         },
@@ -203,6 +213,7 @@ export const getTrainerById = async (
           name: true,
           email: true,
           phone: true,
+          avatarUrl: true,
           isActive: true,
         },
       },
@@ -240,6 +251,7 @@ export const getTrainerByUserId = async (
           name: true,
           email: true,
           phone: true,
+          avatarUrl: true,
           isActive: true,
         },
       },
@@ -313,6 +325,7 @@ export const updateTrainer = async (
             name: true,
             email: true,
             phone: true,
+            avatarUrl: true,
             isActive: true,
           },
         },
@@ -333,6 +346,11 @@ export const updateTrainer = async (
     description: `تم تعديل بيانات المدرب (${dto.user.name})`,
     beforeData: formatTrainerDto(existing as any),
     afterData: dto,
+  })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.TRAINER_UPDATED, {
+    trainerId: dto.id,
+    action: 'updated',
   })
 
   return dto
@@ -370,6 +388,7 @@ export const updateTrainerStatus = async (
           name: true,
           email: true,
           phone: true,
+          avatarUrl: true,
           isActive: true,
         },
       },
@@ -389,6 +408,11 @@ export const updateTrainerStatus = async (
       : `تم تعطيل حساب المدرب (${dto.user.name})`,
     beforeData: { isActive: existing.user.isActive },
     afterData: { isActive: dto.user.isActive },
+  })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.TRAINER_UPDATED, {
+    trainerId: dto.id,
+    action: isActive ? 'activated' : 'deactivated',
   })
 
   return dto
@@ -442,5 +466,10 @@ export const deleteTrainer = async (
     entityId: existing.id,
     description: `تم حذف ملف المدرب (${existing.user.name})`,
     beforeData: { trainerId: existing.id, userName: existing.user.name },
+  })
+
+  emitGymEvent(gymId, REALTIME_EVENTS.TRAINER_UPDATED, {
+    trainerId: existing.id,
+    action: 'deleted',
   })
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
+import { normalizeEgyptianPhone } from './member.validator.js'
 
-const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+const EGYPTIAN_PHONE_REGEX = /^01[0125][0-9]{8}$/
 
 export const gymSetupSchema = z.object({
   name: z
@@ -9,14 +10,23 @@ export const gymSetupSchema = z.object({
     .min(2, 'يجب أن يتكون اسم النادي من حرفين على الأقل / Gym name must be at least 2 characters')
     .max(100, 'اسم النادي طويل جداً (الحد الأقصى 100 حرف) / Gym name is too long'),
   phone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    )
+    .any()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform((val) => {
+      if (!val || String(val).trim() === '') return null
+      return normalizeEgyptianPhone(val)
+    })
+    .pipe(
+      z
+        .string()
+        .regex(
+          EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+        )
+        .nullable()
+        .optional()
+    ),
   email: z
     .string()
     .trim()
@@ -39,7 +49,9 @@ export const gymSetupSchema = z.object({
   logo: z
     .string()
     .trim()
-    .url('صيغة رابط الشعار غير صحيحة / Invalid logo URL')
+    .refine((val) => !val || val.startsWith('data:image/') || val.startsWith('/uploads/') || /^https?:\/\//i.test(val), {
+      message: 'صيغة رابط الشعار غير صحيحة / Invalid logo format',
+    })
     .optional()
     .or(z.literal('')),
   currency: z
@@ -63,15 +75,24 @@ export const updateGymSchema = z
       .max(100, 'اسم النادي طويل جداً (الحد الأقصى 100 حرف) / Gym name is too long')
       .optional(),
     phone: z
-      .string()
-      .trim()
-      .regex(
-        EGYPTIAN_PHONE_REGEX,
-        'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-      )
+      .any()
       .optional()
       .nullable()
-      .or(z.literal('')),
+      .transform((val) => {
+        if (val === undefined) return undefined
+        if (val === null || String(val).trim() === '') return null
+        return normalizeEgyptianPhone(val)
+      })
+      .pipe(
+        z
+          .string()
+          .regex(
+            EGYPTIAN_PHONE_REGEX,
+            'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+          )
+          .nullable()
+          .optional()
+      ),
     email: z
       .string()
       .trim()
@@ -97,7 +118,9 @@ export const updateGymSchema = z
     logo: z
       .string()
       .trim()
-      .url('صيغة رابط الشعار غير صحيحة / Invalid logo URL')
+      .refine((val) => !val || val.startsWith('data:image/') || val.startsWith('/uploads/') || /^https?:\/\//i.test(val), {
+        message: 'صيغة رابط الشعار غير صحيحة / Invalid logo format',
+      })
       .optional()
       .nullable()
       .or(z.literal('')),

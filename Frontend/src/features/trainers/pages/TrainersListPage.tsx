@@ -20,6 +20,7 @@ import {
 import { trainersApi } from '../services/trainersApi'
 import type { TrainerItem } from '../types/trainer.types'
 import { useAuth } from '@/features/auth/context/AuthContext'
+import { useRealtimeSync } from '@/services/socket'
 
 export interface Trainer {
   id: string
@@ -107,6 +108,11 @@ export const TrainersListPage: React.FC = () => {
   React.useEffect(() => {
     loadTrainers()
   }, [loadTrainers])
+
+  // Instant Real-Time WebSocket updates for Trainers List
+  useRealtimeSync(undefined, () => {
+    loadTrainers()
+  })
 
   // Reset Filters
   const handleResetFilters = () => {

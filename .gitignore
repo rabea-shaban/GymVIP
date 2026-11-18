@@ -32,6 +32,13 @@ yarn-error.log*
 npm-cache/
 **/npm-cache/
 
+# User Uploads
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+!Backend/uploads/members/
+!Backend/uploads/users/
+!Backend/uploads/gyms/
+
 # OS and Editor files
 .DS_Store
 Thumbs.db

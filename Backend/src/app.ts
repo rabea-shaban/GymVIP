@@ -9,6 +9,7 @@ import { notFoundHandler } from './middlewares/notFound.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js'
+import { ensureUploadDirs, UPLOADS_ROOT } from './utils/fileStorage.util.js'
 
 export const createApp = (): Express => {
   const app = express()
@@ -73,7 +74,18 @@ export const createApp = (): Express => {
     app.use(morgan('dev'))
   }
 
-  // 7. API V1 Routes
+  // 7. Static Uploads File Serving
+  ensureUploadDirs()
+  app.use(
+    '/uploads',
+    express.static(UPLOADS_ROOT, {
+      maxAge: env.NODE_ENV === 'production' ? '7d' : '1h',
+      etag: true,
+      fallthrough: true,
+    })
+  )
+
+  // 8. API V1 Routes
   app.use('/api/v1', apiRouter)
 
   // 6. 404 Not Found Middleware

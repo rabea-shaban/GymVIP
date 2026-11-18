@@ -56,6 +56,7 @@ export interface DashboardOverviewData {
     memberName: string
     memberCode: string
     memberPhone: string
+    memberAvatarUrl?: string | null
     planName: string
     endDate: string
     daysRemaining: number

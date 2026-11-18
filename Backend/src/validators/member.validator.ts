@@ -1,26 +1,172 @@
 import { z } from 'zod'
 import { Gender } from '@prisma/client'
 
-const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+/**
+ * Normalizes Egyptian phone numbers:
+ * - Converts Arabic-Indic numerals (٠-٩) to English (0-9)
+ * - Removes spaces, dashes, dots, brackets
+ * - Strips country code prefixes (+20, 0020, 20)
+ * - Adds leading 0 if missing (10 digits starting with 1 -> 01...)
+ */
+export const normalizeEgyptianPhone = (val: unknown): string => {
+  if (!val) return ''
+  let s = String(val)
+    .trim()
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[\s\-\(\)\.]/g, '')
+  if (s.startsWith('0020')) s = s.slice(4)
+  else if (s.startsWith('+20')) s = s.slice(3)
+  else if (s.startsWith('20') && s.length === 12) s = s.slice(2)
+  if (!s.startsWith('0') && s.length === 10) s = '0' + s
+  return s
+}
+
+/**
+ * Parses flexible dates:
+ * - Arabic-Indic numerals (٠-٩)
+ * - DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+ * - YYYY-MM-DD, ISO string
+ */
+export const parseDateFlexible = (val: unknown): string | null => {
+  if (!val) return null
+  let s = String(val).trim()
+  if (!s) return null
+  s = s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+  const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
+  if (dmy && dmy[1] && dmy[2] && dmy[3]) {
+    s = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+  }
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return null
+  return s
+}
 
 const dateOfBirthSchema = z
-  .string()
-  .trim()
+  .any()
   .optional()
   .nullable()
-  .or(z.literal(''))
-  .refine(
-    (val) => {
-      if (!val) return true
-      const parsed = new Date(val)
-      if (isNaN(parsed.getTime())) return false
-      // Must not be in the future
-      return parsed <= new Date()
-    },
-    {
-      message: 'تاريخ الميلاد غير صالح أو يقع في المستقبل / Date of birth must not be in the future',
+  .superRefine((val, ctx) => {
+    if (!val || String(val).trim() === '') return
+    const parsed = parseDateFlexible(val)
+    if (!parsed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'صيغة تاريخ الميلاد غير صحيحة / Invalid date of birth format',
+      })
+      return
     }
+    const d = new Date(parsed)
+    if (isNaN(d.getTime()) || d > new Date()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'تاريخ الميلاد غير صالح أو يقع في المستقبل / Date of birth must not be in the future',
+      })
+    }
+  })
+  .transform((val) => {
+    if (!val || String(val).trim() === '') return null
+    return parseDateFlexible(val)
+  })
+
+const phoneSchema = z
+  .any()
+  .refine((val) => val !== undefined && val !== null && String(val).trim() !== '', {
+    message: 'رقم الهاتف مطلوب / Phone number is required',
+  })
+  .transform(normalizeEgyptianPhone)
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^01[0125][0-9]{8}$/,
+        'يرجى إدخال رقم هاتف محمول مصري صحيح مكون من 11 رقماً (مثال: 01012345678) / Invalid Egyptian phone number'
+      )
   )
+
+const updatePhoneSchema = z
+  .any()
+  .optional()
+  .transform((val) => {
+    if (val === undefined || val === null || String(val).trim() === '') return undefined
+    return normalizeEgyptianPhone(val)
+  })
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^01[0125][0-9]{8}$/,
+        'يرجى إدخال رقم هاتف محمول مصري صحيح مكون من 11 رقماً (مثال: 01012345678) / Invalid Egyptian phone number'
+      )
+      .optional()
+  )
+
+const optionalPhoneSchema = z
+  .any()
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (!val || String(val).trim() === '') return null
+    return normalizeEgyptianPhone(val)
+  })
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^01[0125][0-9]{8}$/,
+        'يرجى إدخال رقم هاتف طوارئ مصري صحيح مكون من 11 رقماً (مثال: 01112345678) / Invalid Egyptian emergency phone'
+      )
+      .nullable()
+      .optional()
+  )
+
+const genderSchema = z
+  .any()
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (!val || val === '') return null
+    if (val === 'MALE' || val === 'FEMALE') return val as Gender
+    return null
+  })
+
+const optionalEmailSchema = z
+  .any()
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (!val) return null
+    const s = String(val).trim().toLowerCase()
+    return s.length > 0 ? s : null
+  })
+  .pipe(
+    z
+      .string()
+      .email('صيغة البريد الإلكتروني غير صحيحة / Invalid email format')
+      .nullable()
+      .optional()
+  )
+
+const optionalText = (maxLen: number, errorMsg: string) =>
+  z
+    .any()
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (!val) return null
+      const s = String(val).trim()
+      return s.length > 0 ? s : null
+    })
+    .pipe(z.string().max(maxLen, errorMsg).nullable().optional())
+
+const avatarUrlSchema = z
+  .any()
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (!val) return null
+    const s = String(val).trim()
+    return s.length > 0 ? s : null
+  })
 
 export const createMemberSchema = z.object({
   name: z
@@ -28,64 +174,15 @@ export const createMemberSchema = z.object({
     .trim()
     .min(2, 'يجب أن يتكون اسم العضو من حرفين على الأقل / Name must be at least 2 characters')
     .max(100, 'اسم العضو طويل جداً (الحد الأقصى 100 حرف)'),
-  phone: z
-    .string({ required_error: 'رقم الهاتف مطلوب / Phone number is required' })
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    ),
-  email: z
-    .string()
-    .trim()
-    .email('صيغة البريد الإلكتروني غير صحيحة / Invalid email format')
-    .toLowerCase()
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  gender: z
-    .nativeEnum(Gender, {
-      errorMap: () => ({ message: 'النوع المحدد غير صالح (MALE أو FEMALE)' }),
-    })
-    .optional()
-    .nullable(),
+  phone: phoneSchema,
+  email: optionalEmailSchema,
+  gender: genderSchema,
   dateOfBirth: dateOfBirthSchema,
-  address: z
-    .string()
-    .trim()
-    .max(255, 'العنوان طويل جداً (الحد الأقصى 255 حرف)')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  emergencyContactName: z
-    .string()
-    .trim()
-    .max(100, 'اسم شخص الطوارئ طويل جداً (الحد الأقصى 100 حرف)')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  emergencyContactPhone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف طوارئ مصري صحيح (مثال: 01112345678) / Invalid Egyptian emergency phone'
-    )
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  notes: z
-    .string()
-    .trim()
-    .max(2000, 'الملاحظات طويلة جداً (الحد الأقصى 2000 حرف)')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  avatarUrl: z
-    .string()
-    .optional()
-    .nullable()
-    .or(z.literal('')),
+  address: optionalText(255, 'العنوان طويل جداً (الحد الأقصى 255 حرف)'),
+  emergencyContactName: optionalText(100, 'اسم شخص الطوارئ طويل جداً (الحد الأقصى 100 حرف)'),
+  emergencyContactPhone: optionalPhoneSchema,
+  notes: optionalText(2000, 'الملاحظات طويلة جداً (الحد الأقصى 2000 حرف)'),
+  avatarUrl: avatarUrlSchema,
 })
 
 export const updateMemberSchema = z.object({
@@ -95,65 +192,15 @@ export const updateMemberSchema = z.object({
     .min(2, 'يجب أن يتكون اسم العضو من حرفين على الأقل / Name must be at least 2 characters')
     .max(100, 'اسم العضو طويل جداً')
     .optional(),
-  phone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    )
-    .optional(),
-  email: z
-    .string()
-    .trim()
-    .email('صيغة البريد الإلكتروني غير صحيحة / Invalid email format')
-    .toLowerCase()
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  gender: z
-    .nativeEnum(Gender, {
-      errorMap: () => ({ message: 'النوع المحدد غير صالح (MALE أو FEMALE)' }),
-    })
-    .optional()
-    .nullable(),
+  phone: updatePhoneSchema,
+  email: optionalEmailSchema,
+  gender: genderSchema,
   dateOfBirth: dateOfBirthSchema,
-  address: z
-    .string()
-    .trim()
-    .max(255, 'العنوان طويل جداً')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  emergencyContactName: z
-    .string()
-    .trim()
-    .max(100, 'اسم شخص الطوارئ طويل جداً')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  emergencyContactPhone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف طوارئ مصري صحيح (مثال: 01112345678) / Invalid Egyptian emergency phone'
-    )
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  notes: z
-    .string()
-    .trim()
-    .max(2000, 'الملاحظات طويلة جداً')
-    .optional()
-    .nullable()
-    .or(z.literal('')),
-  avatarUrl: z
-    .string()
-    .optional()
-    .nullable()
-    .or(z.literal('')),
+  address: optionalText(255, 'العنوان طويل جداً'),
+  emergencyContactName: optionalText(100, 'اسم شخص الطوارئ طويل جداً'),
+  emergencyContactPhone: optionalPhoneSchema,
+  notes: optionalText(2000, 'الملاحظات طويلة جداً'),
+  avatarUrl: avatarUrlSchema,
 })
 
 export const updateMemberStatusSchema = z.object({

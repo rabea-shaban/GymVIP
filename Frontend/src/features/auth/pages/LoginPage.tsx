@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
     { id: 'owner', label: 'صاحب النادي', email: 'capt.ahmed@gymvip.eg', roleName: 'Owner / Admin' },
     { id: 'manager', label: 'المدير التنفيذي', email: 'manager@gymvip.eg', roleName: 'Branch Manager' },
     { id: 'reception', label: 'موظف الاستقبال', email: 'reception@gymvip.eg', roleName: 'Receptionist' },
-    { id: 'trainer', label: 'المدرب الرياضي', email: 'coach.tarek@gymvip.eg', roleName: 'Fitness Coach' },
+    { id: 'trainer', label: 'المدرب الرياضي', email: 'amlb31388@gmail.com', roleName: 'Fitness Coach' },
   ]
 
   const handleRoleSelect = (role: RoleCredential) => {
@@ -72,9 +72,15 @@ export const LoginPage: React.FC = () => {
       }
 
       await login({ phoneOrEmail: email, password, role })
+      const target =
+        role === 'TRAINER'
+          ? '/app/trainer/dashboard'
+          : role === 'RECEPTIONIST'
+          ? '/app/reception/dashboard'
+          : '/app/dashboard'
       setSuccessMessage('تم التحقق بنجاح! جاري التوجيه للوحة التحكم...')
       setTimeout(() => {
-        navigate('/app/dashboard')
+        navigate(target)
       }, 500)
     } catch (err: any) {
       setErrorMessage(err.message || 'فشل تسجيل الدخول. يرجى التحقق من صحة البريد الإلكتروني وكلمة المرور.')
@@ -166,8 +172,8 @@ export const LoginPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="font-mono text-zinc-300 font-bold">الإصدار Enterprise 4.2</span>
               <span className="text-zinc-600">•</span>
-              <span className="flex items-center gap-1 text-zinc-300">
-                <span>🇪🇬</span>
+              <span className="flex items-center gap-1.5 text-zinc-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
                 <span>متوافق مع الفاتورة الإلكترونية المصرية</span>
               </span>
             </div>
@@ -196,7 +202,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex flex-col text-left">
                 <div className="flex items-center gap-1.5 justify-end">
                   <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-900 border border-amber-300">
-                    مصر 🇪🇬
+                    مصر
                   </span>
                   <span className="text-xl font-black font-cairo tracking-wide text-zinc-950">
                     Gym<span className="text-[#D4AF37]">VIP</span>
@@ -401,7 +407,7 @@ export const LoginPage: React.FC = () => {
           {/* Page Bottom Footer */}
           <div className="pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-zinc-400">
             <div className="flex items-center gap-1.5">
-              <span>🛡️</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
               <span>تشفير آمن 256-bit • خوادم جمهورية مصر العربية</span>
             </div>
             <div className="flex items-center gap-3">

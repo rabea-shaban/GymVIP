@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,13 +21,16 @@ import {
   ChevronLeft,
   X,
   Lock,
+  Upload,
+  Trash2,
+  Check,
 } from 'lucide-react'
 import { gymApi } from '@/features/gym/services/gymApi'
 import type { GymProfile, UpdateGymInput } from '@/features/gym/types/gym.types'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-
-// Egyptian Mobile Phone Regex
-const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+import { normalizePhone, EGYPTIAN_PHONE_REGEX } from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
+import { getMediaUrl } from '@/lib/media'
 
 // Settings Schema
 const settingsFormSchema = z
@@ -40,9 +43,10 @@ const settingsFormSchema = z
     phone: z
       .string()
       .trim()
-      .regex(
-        EGYPTIAN_PHONE_REGEX,
-        'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678)'
+      .transform((val) => (val ? normalizePhone(val) : ''))
+      .refine(
+        (val) => !val || EGYPTIAN_PHONE_REGEX.test(val),
+        'يرجى إدخال رقم هاتف محمول مصري صحيح (11 رقماً يبدأ بـ 010 أو 011 أو 012 أو 015)'
       )
       .optional()
       .or(z.literal('')),
@@ -55,7 +59,14 @@ const settingsFormSchema = z
       .or(z.literal('')),
     address: z.string().trim().max(200, 'العنوان طويل جداً').optional().or(z.literal('')),
     city: z.string().trim().max(100, 'اسم المدينة طويل جداً').optional().or(z.literal('')),
-    logo: z.string().trim().url('صيغة رابط الشعار غير صحيحة').optional().or(z.literal('')),
+    logo: z
+      .string()
+      .trim()
+      .refine((val) => !val || val.startsWith('data:image/') || /^https?:\/\//i.test(val), {
+        message: 'صيغة الشعار غير صحيحة، يجب أن يكون رابطاً مباشراً أو ملف صورة صالح',
+      })
+      .optional()
+      .or(z.literal('')),
     subscriptionReminderEnabled: z.boolean(),
     subscriptionReminderDays: z.array(z.number()),
     subscriptionFreezeEnabled: z.boolean(),
@@ -118,11 +129,13 @@ const SETTINGS_TABS: SettingsTab[] = [
 ]
 
 export const SettingsPage: React.FC = () => {
-  const { user } = useAuth()
+  const { user, updateGymData } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<SettingsTabId>('gym_profile')
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
 
   const canEdit = user?.role === 'OWNER' || user?.role === 'MANAGER'
 
@@ -135,7 +148,11 @@ export const SettingsPage: React.FC = () => {
     refetch,
   } = useQuery<GymProfile>({
     queryKey: ['gym-profile'],
-    queryFn: () => gymApi.getProfile(),
+    queryFn: async () => {
+      const data = await gymApi.getProfile()
+      updateGymData(data)
+      return data
+    },
     staleTime: 1000 * 60 * 5,
   })
 
@@ -150,6 +167,7 @@ export const SettingsPage: React.FC = () => {
     formState: { errors, isDirty },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
+    mode: 'onChange',
     defaultValues: {
       name: '',
       phone: '',
@@ -192,6 +210,7 @@ export const SettingsPage: React.FC = () => {
     onSuccess: (updatedGym) => {
       queryClient.setQueryData(['gym-profile'], updatedGym)
       queryClient.invalidateQueries({ queryKey: ['gym-profile'] })
+      updateGymData(updatedGym)
       reset({
         name: updatedGym.name || '',
         phone: updatedGym.phone || '',
@@ -218,12 +237,78 @@ export const SettingsPage: React.FC = () => {
     },
   })
 
+  const processLogoFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('يرجى اختيار ملف صورة صالح (PNG أو JPG أو WebP)'))
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        reject(new Error('حجم الصورة كبير جداً، الحد الأقصى 5 ميجابايت'))
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const maxDim = 500
+          let width = img.width
+          let height = img.height
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width)
+              width = maxDim
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height)
+              height = maxDim
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height)
+            const isPng = file.type === 'image/png'
+            resolve(canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.9))
+          } else {
+            resolve(event.target?.result as string)
+          }
+        }
+        img.onerror = () => reject(new Error('تعذر قراءة ملف الصورة'))
+        img.src = event.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('تعذر قراءة ملف الصورة'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const dataUrl = await processLogoFile(file)
+      setValue('logo', dataUrl, { shouldDirty: true, shouldValidate: true })
+      setErrorMessage(null)
+    } catch (err: any) {
+      setErrorMessage(err.message || 'فشل اختيار الشعار')
+    } finally {
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = ''
+      }
+    }
+  }
+
   const onSubmit = (values: SettingsFormValues) => {
     if (!canEdit) return
 
     const payload: UpdateGymInput = {
       name: values.name.trim(),
-      phone: values.phone?.trim() || null,
+      phone: values.phone?.trim() ? normalizePhone(values.phone) : null,
       email: values.email?.trim() || null,
       address: values.address?.trim() || null,
       city: values.city?.trim() || null,
@@ -482,7 +567,7 @@ export const SettingsPage: React.FC = () => {
                     <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-zinc-950 border border-zinc-800 flex flex-col items-center justify-center text-center p-3 shrink-0 shadow-sm relative overflow-hidden">
                       {logoValue ? (
                         <img
-                          src={logoValue}
+                          src={getMediaUrl(logoValue)}
                           alt="Gym Logo"
                           className="w-full h-full object-contain"
                           onError={(e) => {
@@ -501,25 +586,63 @@ export const SettingsPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex-1 space-y-2 text-center sm:text-right w-full">
-                      <h3 className="text-sm font-bold text-zinc-900">شعار الجيم (Logo URL)</h3>
-                      <p className="text-xs text-zinc-500 leading-relaxed">
-                        أدخل رابطاً مباشراً لصورة الشعار (صيغ PNG / JPG بخلفية شفافة مفضلة).
-                      </p>
-                      <div className="pt-1">
+                    <div className="flex-1 space-y-3 text-center sm:text-right w-full">
+                      <div>
+                        <h3 className="text-sm font-bold text-zinc-900">شعار الجيم (Logo)</h3>
+                        <p className="text-xs text-zinc-500 leading-relaxed">
+                          شعار الصالة الرياضية الذي يظهر في القائمة الجانبية والفواتير والتقارير الرسمية.
+                        </p>
+                      </div>
+
+                      {/* File Upload Controls */}
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                         <input
-                          type="url"
+                          ref={logoFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleLogoFileChange}
+                          disabled={!canEdit}
+                        />
+                        <button
+                          type="button"
+                          disabled={!canEdit}
+                          onClick={() => logoFileInputRef.current?.click()}
+                          className="px-3.5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-gym-gold" />
+                          <span>رفع شعار من الجهاز</span>
+                        </button>
+
+                        {logoValue && (
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() =>
+                              setValue('logo', '', { shouldDirty: true, shouldValidate: true })
+                            }
+                            className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 flex items-center gap-1.5 transition disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>إزالة الشعار</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* URL input fallback */}
+                      <div className="pt-1">
+                        <label className="block text-[11px] font-semibold text-zinc-500 mb-1">
+                          أو أدخل رابطاً مباشراً للصورة (URL):
+                        </label>
+                        <input
+                          type="text"
                           dir="ltr"
                           disabled={!canEdit}
                           {...register('logo')}
                           placeholder="https://example.com/logo.png"
                           className="w-full p-2.5 bg-white border border-zinc-200 rounded-xl text-xs font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition disabled:bg-zinc-100 disabled:opacity-60"
                         />
-                        {errors.logo && (
-                          <p className="text-xs text-rose-600 mt-1 font-semibold">
-                            {errors.logo.message}
-                          </p>
-                        )}
+                        {errors.logo && <FieldError error={errors.logo.message} />}
                       </div>
                     </div>
                   </div>
@@ -541,9 +664,7 @@ export const SettingsPage: React.FC = () => {
                         />
                         <Building2 className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      {errors.name && (
-                        <p className="text-xs text-rose-600 font-semibold">{errors.name.message}</p>
-                      )}
+                      <FieldError error={errors.name?.message} />
                     </div>
 
                     {/* Official Phone */}
@@ -563,9 +684,7 @@ export const SettingsPage: React.FC = () => {
                         />
                         <Phone className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      {errors.phone && (
-                        <p className="text-xs text-rose-600 font-semibold">{errors.phone.message}</p>
-                      )}
+                      <FieldError error={errors.phone?.message} />
                     </div>
 
                     {/* Official Email */}
@@ -582,9 +701,7 @@ export const SettingsPage: React.FC = () => {
                         />
                         <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      {errors.email && (
-                        <p className="text-xs text-rose-600 font-semibold">{errors.email.message}</p>
-                      )}
+                      <FieldError error={errors.email?.message} />
                     </div>
 
                     {/* City */}
@@ -597,9 +714,7 @@ export const SettingsPage: React.FC = () => {
                         placeholder="القاهرة"
                         className="w-full p-2.5 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition disabled:bg-zinc-100 disabled:opacity-60"
                       />
-                      {errors.city && (
-                        <p className="text-xs text-rose-600 font-semibold">{errors.city.message}</p>
-                      )}
+                      <FieldError error={errors.city?.message} />
                     </div>
                   </div>
 
@@ -616,9 +731,7 @@ export const SettingsPage: React.FC = () => {
                       />
                       <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
-                    {errors.address && (
-                      <p className="text-xs text-rose-600 font-semibold">{errors.address.message}</p>
-                    )}
+                    <FieldError error={errors.address?.message} />
                   </div>
                 </div>
               )}
@@ -691,7 +804,7 @@ export const SettingsPage: React.FC = () => {
                                 isSelected ? 'bg-gold-500 text-zinc-950 font-black' : 'border border-zinc-300'
                               }`}
                             >
-                              {isSelected ? '✓' : ''}
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                             </span>
                           </button>
                         )
@@ -699,9 +812,7 @@ export const SettingsPage: React.FC = () => {
                     </div>
 
                     {errors.subscriptionReminderDays && (
-                      <p className="text-xs text-rose-600 font-semibold">
-                        {errors.subscriptionReminderDays.message}
-                      </p>
+                      <FieldError error={errors.subscriptionReminderDays.message} />
                     )}
                   </div>
                 </div>
@@ -755,9 +866,7 @@ export const SettingsPage: React.FC = () => {
                       />
                       <p className="text-xs text-zinc-400">الحد الأقصى المسموح به هو 90 يوماً.</p>
                       {errors.maxFreezeDays && (
-                        <p className="text-xs text-rose-600 font-semibold">
-                          {errors.maxFreezeDays.message}
-                        </p>
+                        <FieldError error={errors.maxFreezeDays.message} />
                       )}
                     </div>
 
@@ -799,7 +908,7 @@ export const SettingsPage: React.FC = () => {
                                     : 'border border-zinc-300'
                                 }`}
                               >
-                                {isSelected ? '✓' : ''}
+                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                               </span>
                             </button>
                           )
@@ -807,9 +916,7 @@ export const SettingsPage: React.FC = () => {
                       </div>
 
                       {errors.allowedFreezeDurations && (
-                        <p className="text-xs text-rose-600 font-semibold">
-                          {errors.allowedFreezeDurations.message}
-                        </p>
+                        <FieldError error={errors.allowedFreezeDurations.message} />
                       )}
                     </div>
                   </div>

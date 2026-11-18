@@ -1,4 +1,5 @@
 import { api } from '@/services/api'
+import type { GymProfile } from '@/features/gym/types/gym.types'
 
 export interface LoginPayload {
   email: string
@@ -21,14 +22,10 @@ export interface AuthResponseData {
     email: string
     phone: string | null
     role: 'OWNER' | 'MANAGER' | 'RECEPTIONIST' | 'TRAINER'
+    avatarUrl?: string | null
   }
-  gym: {
-    id: string
-    name: string
-    slug: string
-    city: string | null
-    currency: string
-  }
+  gym: GymProfile
+  token?: string
 }
 
 export const authApi = {
@@ -44,6 +41,15 @@ export const authApi = {
 
   getMe: async (): Promise<AuthResponseData> => {
     const res = await api.get('/auth/me')
+    return res.data.data
+  },
+
+  updateProfile: async (payload: {
+    name?: string
+    phone?: string
+    avatarUrl?: string | null
+  }): Promise<AuthResponseData> => {
+    const res = await api.patch('/auth/profile', payload)
     return res.data.data
   },
 

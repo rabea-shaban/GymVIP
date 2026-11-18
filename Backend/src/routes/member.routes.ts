@@ -63,33 +63,33 @@ memberRouter.get(
 
 /**
  * GET /api/v1/members/:memberId/attendance/current
- * OWNER, MANAGER, RECEPTIONIST
+ * OWNER, MANAGER, RECEPTIONIST, TRAINER
  */
 memberRouter.get(
   '/:memberId/attendance/current',
-  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST, Role.TRAINER),
   validate(memberIdParamSchema, 'params'),
   attendanceController.getMemberCurrent
 )
 
 /**
  * GET /api/v1/members/:memberId/attendance
- * OWNER, MANAGER, RECEPTIONIST
+ * OWNER, MANAGER, RECEPTIONIST, TRAINER
  */
 memberRouter.get(
   '/:memberId/attendance',
-  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST, Role.TRAINER),
   validate(memberIdParamSchema, 'params'),
   attendanceController.getMemberHistory
 )
 
 /**
  * POST /api/v1/members/:memberId/check-out
- * OWNER, MANAGER, RECEPTIONIST
+ * OWNER, MANAGER, RECEPTIONIST, TRAINER
  */
 memberRouter.post(
   '/:memberId/check-out',
-  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST, Role.TRAINER),
   validate(memberIdParamSchema, 'params'),
   attendanceController.checkOutByMember
 )

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Users,
@@ -17,7 +18,6 @@ import {
   Clock,
   Shield,
   Zap,
-  Star,
   Copy,
   UserCheck,
   Dumbbell,
@@ -31,6 +31,9 @@ import { trainersApi } from '../services/trainersApi'
 import type { TrainerItem } from '../types/trainer.types'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { membersApi } from '@/features/members/services/membersApi'
+import { attendanceApi } from '@/features/attendance/services/attendanceApi'
+import { Avatar } from '@/components/ui/Avatar'
+import { useRealtimeSync } from '@/services/socket'
 
 export interface Trainee {
   id: string
@@ -41,6 +44,60 @@ export interface Trainee {
   attendanceCount: number
   joinDate: string
   status: 'active' | 'expiring'
+  avatarUrl?: string | null
+}
+
+// Real SVG Icons
+const WhatsAppSvg: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.888 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+  </svg>
+)
+
+const PhoneCallSvg: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+)
+
+const formatWhatsAppUrl = (phone: string) => {
+  let cleaned = phone.replace(/[^0-9]/g, '')
+  if (cleaned.startsWith('0')) {
+    cleaned = '2' + cleaned
+  } else if (!cleaned.startsWith('20') && cleaned.length === 10) {
+    cleaned = '20' + cleaned
+  }
+  return `https://wa.me/${cleaned}`
+}
+
+const formatDateClean = (dateStr?: string | Date | null) => {
+  if (!dateStr) return '—'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(d)
+  } catch {
+    return String(dateStr).slice(0, 10)
+  }
 }
 
 export const TrainerDetailPage: React.FC = () => {
@@ -83,9 +140,10 @@ export const TrainerDetailPage: React.FC = () => {
   const loadTrainer = React.useCallback(async () => {
     if (!id) return
     try {
-      const [data, membersRes] = await Promise.all([
+      const [data, membersRes, attendanceRes] = await Promise.all([
         trainersApi.getById(id),
-        membersApi.list({ limit: 50 }).catch(() => ({ members: [] })),
+        membersApi.list({ limit: 100 }).catch(() => ({ members: [] })),
+        attendanceApi.list({ limit: 200 }).catch(() => ({ attendance: [] })),
       ])
       setTrainerData(data)
       setEditName(data.user.name)
@@ -93,6 +151,15 @@ export const TrainerDetailPage: React.FC = () => {
       setEditSpecialization(data.specialization || '')
       setEditBio(data.bio || '')
       setTrainerStatus(data.user.isActive ? 'active' : 'suspended')
+
+      const attendanceCounts: Record<string, number> = {}
+      if (attendanceRes?.attendance) {
+        attendanceRes.attendance.forEach((att) => {
+          if (att.memberId) {
+            attendanceCounts[att.memberId] = (attendanceCounts[att.memberId] || 0) + 1
+          }
+        })
+      }
 
       if (membersRes.members && membersRes.members.length > 0) {
         const mapped: Trainee[] = membersRes.members.map((m) => {
@@ -102,10 +169,11 @@ export const TrainerDetailPage: React.FC = () => {
             name: m.name,
             code: m.memberCode,
             phone: m.phone,
-            plan: sub?.planName || 'بدون اشتراك',
-            attendanceCount: 0,
-            joinDate: new Date(m.createdAt).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' }),
+            plan: sub?.planName || 'بدون اشتراك نشط',
+            attendanceCount: attendanceCounts[m.id] || 0,
+            joinDate: formatDateClean(m.createdAt),
             status: m.isActive ? 'active' : 'expiring',
+            avatarUrl: m.avatarUrl,
           }
         })
         setTrainees(mapped)
@@ -118,6 +186,11 @@ export const TrainerDetailPage: React.FC = () => {
   React.useEffect(() => {
     loadTrainer()
   }, [loadTrainer])
+
+  // Instant Real-Time WebSocket updates for Trainer Profile
+  useRealtimeSync(undefined, () => {
+    loadTrainer()
+  })
 
   // Copy phone handler
   const handleCopyPhone = () => {
@@ -137,7 +210,8 @@ export const TrainerDetailPage: React.FC = () => {
 
   const trainerName = trainerData?.user.name || 'مدرب'
   const trainerCode = trainerData ? `TR-${trainerData.id.slice(0, 6)}` : ''
-  const avatarInitials = trainerName.slice(0, 2)
+  const activeTraineesCount = trainees.filter((t) => t.status === 'active').length
+  const activePercentage = trainees.length > 0 ? Math.round((activeTraineesCount / trainees.length) * 100) : 0
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16 font-cairo" dir="rtl">
@@ -182,9 +256,12 @@ export const TrainerDetailPage: React.FC = () => {
           <div className="flex items-start sm:items-center gap-5">
             {/* Avatar with Camera Button */}
             <div className="relative shrink-0">
-              <div className="w-20 h-20 bg-zinc-950 rounded-full flex items-center justify-center text-white text-2xl font-bold font-cairo shadow-md select-none border border-zinc-800">
-                <span>{avatarInitials}</span>
-              </div>
+              <Avatar
+                src={trainerData?.user.avatarUrl || undefined}
+                name={trainerName}
+                size="xl"
+                className="w-20 h-20 text-2xl ring-2 ring-gym-gold/40 shadow-md shrink-0 border border-zinc-800"
+              />
               <button
                 type="button"
                 onClick={() => triggerToast('فتح نافذة تغيير صورة المدرب...')}
@@ -220,29 +297,22 @@ export const TrainerDetailPage: React.FC = () => {
               </div>
 
               {/* Contact meta row */}
-              <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-600">
-                <div className="flex items-center gap-1.5 font-mono">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-600 mt-2">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-zinc-50 border border-zinc-200/80 font-mono shadow-2xs">
                   <Phone className="w-3.5 h-3.5 text-zinc-400" />
                   <span dir="ltr">{trainerData?.user.phone || '—'}</span>
-                  <span className="text-[11px] bg-zinc-100 px-1 py-0.2 rounded border border-zinc-200">
-                    مصر 🇪🇬
+                  <span className="text-[10px] bg-zinc-200/80 px-1 py-0.2 rounded font-sans text-zinc-600">
+                    مصر
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-zinc-50 border border-zinc-200/80 font-mono shadow-2xs" dir="ltr">
                   <Mail className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="font-mono">{trainerData?.user.email || '—'}</span>
+                  <span>{trainerData?.user.email || '—'}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-zinc-500">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-zinc-50 border border-zinc-200/80 text-zinc-600 font-medium shadow-2xs">
                   <Calendar className="w-3.5 h-3.5 text-zinc-400" />
                   <span>
-                    انضم في:{' '}
-                    {trainerData?.createdAt
-                      ? new Date(trainerData.createdAt).toLocaleDateString('ar-EG', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })
-                      : '—'}
+                    انضم في: {formatDateClean(trainerData?.createdAt)}
                   </span>
                 </div>
               </div>
@@ -298,12 +368,14 @@ export const TrainerDetailPage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-zinc-900 tracking-tight">14</span>
+            <span className="text-3xl font-black text-zinc-900 tracking-tight">{activeTraineesCount}</span>
             <span className="bg-emerald-50 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded border border-emerald-200">
               نشط الآن
             </span>
           </div>
-          <p className="text-[11px] text-zinc-400">يمثلون 85% من سعة المدرب المقترحة</p>
+          <p className="text-[11px] text-zinc-400">
+            {trainees.length > 0 ? `${activePercentage}% من إجمالي المتدربين المسندين` : 'لا يوجد متدربون مسجلون'}
+          </p>
         </div>
 
         {/* Card 2: إجمالي المتدربين */}
@@ -318,7 +390,7 @@ export const TrainerDetailPage: React.FC = () => {
             <span className="text-3xl font-black text-zinc-900 tracking-tight">{trainees.length}</span>
             <span className="text-[11px] text-zinc-400 font-semibold">مسجل</span>
           </div>
-          <p className="text-[11px] text-zinc-400">إجمالي المتدربين المرتبطين</p>
+          <p className="text-[11px] text-zinc-400">إجمالي المتدربين المرتبطين بالنظام</p>
         </div>
 
         {/* Card 3: مدة العمل */}
@@ -331,16 +403,11 @@ export const TrainerDetailPage: React.FC = () => {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">
-              {trainerData?.createdAt
-                ? new Date(trainerData.createdAt).toLocaleDateString('ar-EG', {
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                : 'معتمد'}
+              {formatDateClean(trainerData?.createdAt)}
             </span>
           </div>
           <p className="text-[11px] text-zinc-400">
-            تاريخ التسجيل: {trainerData?.createdAt ? new Date(trainerData.createdAt).toLocaleDateString('ar-EG') : 'حديث'}
+            تاريخ اعتماد وتفعيل الحساب
           </p>
         </div>
 
@@ -355,14 +422,16 @@ export const TrainerDetailPage: React.FC = () => {
           <div className="flex items-baseline justify-between">
             <span
               className={`text-2xl font-black tracking-tight ${
-                trainerStatus === 'active' ? 'text-emerald-600' : 'text-zinc-500'
+                (trainerData ? trainerData.user.isActive : trainerStatus === 'active')
+                  ? 'text-emerald-600'
+                  : 'text-zinc-500'
               }`}
             >
-              {trainerStatus === 'active' ? 'نشط' : 'معطل'}
+              {(trainerData ? trainerData.user.isActive : trainerStatus === 'active') ? 'نشط' : 'معطل'}
             </span>
             <span className="text-[11px] text-zinc-500 font-semibold">على رأس العمل</span>
           </div>
-          <p className="text-[11px] text-zinc-400">صلاحية النظام سارية ومفعلة</p>
+          <p className="text-[11px] text-zinc-400">صلاحية النظام سارية ومسجلة</p>
         </div>
       </div>
 
@@ -393,7 +462,7 @@ export const TrainerDetailPage: React.FC = () => {
           <Users className="w-4 h-4" />
           <span>المتدربون</span>
           <span className="bg-[#FAF0D3] text-[#7E6517] text-[10px] font-black px-1.5 py-0.2 rounded-full border border-[#ECD9A2]">
-            14
+            {trainees.length}
           </span>
         </button>
 
@@ -481,13 +550,7 @@ export const TrainerDetailPage: React.FC = () => {
                 <div className="bg-zinc-50/80 border border-zinc-200/70 rounded-xl p-3.5 space-y-1 sm:col-span-2">
                   <span className="text-zinc-400 font-medium">تاريخ الانضمام للنادي</span>
                   <p className="text-sm font-bold text-zinc-900">
-                    {trainerData?.createdAt
-                      ? new Date(trainerData.createdAt).toLocaleDateString('ar-EG', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })
-                      : 'معتمد'}
+                    {formatDateClean(trainerData?.createdAt)}
                   </p>
                 </div>
               </div>
@@ -597,26 +660,27 @@ export const TrainerDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                   <span className="text-zinc-500">كود النظام المرجعي</span>
                   <span className="bg-zinc-100 text-zinc-800 font-mono font-bold px-2.5 py-0.5 rounded border border-zinc-200/60">
-                    TR-0018
+                    {trainerCode || 'TR-0001'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                   <span className="text-zinc-500">المنسق الإداري</span>
-                  <span className="font-bold text-zinc-900">أحمد مصطفى (المدير)</span>
+                  <span className="font-bold text-zinc-900">{user?.name || 'إدارة الصالة'}</span>
                 </div>
 
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                   <span className="text-zinc-500">تاريخ آخر تحديث</span>
-                  <span className="font-bold text-zinc-800">7 أكتوبر 2026 - 02:15 م</span>
+                  <span className="font-bold text-zinc-800">
+                    {trainerData?.updatedAt ? formatDateClean(trainerData.updatedAt) : 'حديثاً'}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">تقييم المتدربين</span>
-                  <div className="flex items-center gap-1 font-bold text-zinc-900">
-                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <span>4.9</span>
-                    <span className="text-zinc-400 font-normal text-[11px]">(18 تقييم)</span>
+                  <span className="text-zinc-500">حالة المتدربين</span>
+                  <div className="flex items-center gap-1 font-bold text-emerald-600">
+                    <span>{activeTraineesCount} نشط</span>
+                    <span className="text-zinc-400 font-normal text-[11px]">(من إجمالي {trainees.length})</span>
                   </div>
                 </div>
               </div>
@@ -633,7 +697,7 @@ export const TrainerDetailPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-extrabold text-zinc-900">
-                المتدربون المسندون للكابتن أحمد (14 متدرب)
+                المتدربون المسندون للكابتن {trainerName} ({filteredTrainees.length} متدرب)
               </h3>
               <p className="text-xs text-zinc-500 mt-0.5">
                 متابعة الحضور، الاشتراكات الفعالة، وإمكانية إعادة التعيين لمدرب آخر.
@@ -687,25 +751,63 @@ export const TrainerDetailPage: React.FC = () => {
                   {filteredTrainees.map((trainee) => (
                     <tr key={trainee.id} className="hover:bg-zinc-50/60 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-zinc-900">
-                        <div>{trainee.name}</div>
-                        <div className="text-[11px] font-mono text-zinc-400 font-normal">
-                          {trainee.code}
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={trainee.avatarUrl || undefined}
+                            name={trainee.name}
+                            size="sm"
+                            className="border border-zinc-200 shadow-2xs shrink-0 ring-1 ring-zinc-100"
+                          />
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-zinc-900">{trainee.name}</span>
+                            <span className="font-mono text-[11px] font-bold bg-[#FAF0D3] text-[#7E6517] border border-[#ECD9A2] px-2 py-0.5 rounded-md shadow-2xs">
+                              {trainee.code}
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-zinc-700" dir="ltr">
-                        {trainee.phone}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2" dir="ltr">
+                          <span className="font-mono font-bold text-xs text-zinc-700">{trainee.phone}</span>
+                          {trainee.phone && (
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={formatWhatsAppUrl(trainee.phone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition"
+                                title="مراسلة عبر واتساب"
+                              >
+                                <WhatsAppSvg className="w-4 h-4 fill-emerald-600" />
+                              </a>
+                              <a
+                                href={`tel:${trainee.phone}`}
+                                className="p-1 rounded-md text-zinc-700 hover:bg-zinc-100 transition"
+                                title="اتصال هاتفي"
+                              >
+                                <PhoneCallSvg className="w-4 h-4 text-zinc-700" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 text-zinc-800">{trainee.plan}</td>
-                      <td className="py-3.5 px-4 text-center font-bold text-zinc-900">
-                        {trainee.attendanceCount} جلسة
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-zinc-800 bg-zinc-100 px-2.5 py-1 rounded-lg text-xs">
+                          {trainee.plan}
+                        </span>
                       </td>
-                      <td className="py-3.5 px-4 text-zinc-600">{trainee.joinDate}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="font-bold text-zinc-900 bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-md border border-amber-200 text-xs">
+                          <span className="font-mono">{trainee.attendanceCount}</span> جلسة
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-zinc-700 font-semibold">{trainee.joinDate}</td>
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => navigate(`/app/members/${trainee.id}`)}
-                            className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                            className="px-3 py-1 bg-zinc-900 hover:bg-black text-white rounded-lg text-xs font-bold transition shadow-2xs"
                           >
                             الملف
                           </button>
@@ -715,7 +817,7 @@ export const TrainerDetailPage: React.FC = () => {
                               setSelectedTrainee(trainee)
                               setReassignModalOpen(true)
                             }}
-                            className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-lg text-xs font-semibold cursor-pointer"
+                            className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-lg text-xs font-bold transition border border-zinc-200"
                           >
                             نقل
                           </button>
@@ -738,7 +840,7 @@ export const TrainerDetailPage: React.FC = () => {
           <div>
             <h3 className="text-base font-extrabold text-zinc-900">سجل النشاط والتحديثات</h3>
             <p className="text-xs text-zinc-500 mt-0.5">
-              كافة التعديلات الإدارية وتغييرات الحالة الخاصة بالمدرب.
+              كافة التعديلات الإدارية وتغييرات الحالة والارتباطات الخاصة بالمدرب.
             </p>
           </div>
 
@@ -748,33 +850,43 @@ export const TrainerDetailPage: React.FC = () => {
                 <Check className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <p className="font-bold text-zinc-900">إسناد متدرب جديد (محمد حسن إبراهيم)</p>
-                <p className="text-zinc-500">تم تكليف المدرب بمتابعة المشترك في باقة كمال الأجسام.</p>
-                <span className="text-[11px] text-zinc-400 font-mono">اليوم، 11:30 ص</span>
+                <p className="font-bold text-zinc-900">اعتماد حساب المدرب ({trainerName}) بالنادي</p>
+                <p className="text-zinc-500">تم تسجيل وتفعيل صلاحيات المدرب بنجاح تحت تخصص {trainerData?.specialization || 'تدريب عام'}.</p>
+                <span className="text-[11px] text-zinc-400 font-mono">
+                  {formatDateClean(trainerData?.createdAt)}
+                </span>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/70 flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                <Edit3 className="w-4 h-4" />
+                <Users className="w-4 h-4 text-amber-700" />
               </div>
               <div className="space-y-1">
-                <p className="font-bold text-zinc-900">تحديث جدول الحصص التدريبية</p>
-                <p className="text-zinc-500">تم تعديل المواعيد المتاحة للتدريب الشخصي الصباحي.</p>
-                <span className="text-[11px] text-zinc-400 font-mono">أمس، 04:15 م</span>
+                <p className="font-bold text-zinc-900">إسناد قائمة المتدربين ({trainees.length} متدرب)</p>
+                <p className="text-zinc-500">
+                  {trainees.length > 0
+                    ? `متاح للمدرب متابعة المتدربين: ${trainees.map((t) => t.name).slice(0, 3).join('، ')}${trainees.length > 3 ? ' وغيرهم' : ''}.`
+                    : 'لم يتم إسناد متدربين للمدرب حتى الآن.'}
+                </p>
+                <span className="text-[11px] text-zinc-400 font-mono">سجل حي ومحدث</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/70 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
-                <Shield className="w-4 h-4" />
+            {trainerData?.updatedAt && trainerData.updatedAt !== trainerData.createdAt && (
+              <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/70 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-bold text-zinc-900">تحديث الملف والبيانات الإدارية</p>
+                  <p className="text-zinc-500">تم تعديل وتحديث بيانات المدرب بالصالة.</p>
+                  <span className="text-[11px] text-zinc-400 font-mono">
+                    {formatDateClean(trainerData.updatedAt)}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="font-bold text-zinc-900">تجديد الاعتماد السنوي للمدرب</p>
-                <p className="text-zinc-500">تم اعتماد رخصة التدريب الرياضي السنوية داخل النادي.</p>
-                <span className="text-[11px] text-zinc-400 font-mono">10 مارس 2025</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -782,8 +894,8 @@ export const TrainerDetailPage: React.FC = () => {
       {/* ========================================================================= */}
       {/* MODAL 1: Suspend Trainer Modal */}
       {/* ========================================================================= */}
-      {suspendModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in duration-200">
+      {suspendModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 text-right space-y-5 animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
               <PauseCircle className="w-6 h-6" />
@@ -840,14 +952,15 @@ export const TrainerDetailPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL 2: Activate Trainer Modal */}
       {/* ========================================================================= */}
-      {activateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in duration-200">
+      {activateModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 text-right space-y-5 animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
               <PlayCircle className="w-6 h-6" />
@@ -895,14 +1008,15 @@ export const TrainerDetailPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL 3: Reassign Trainee Modal */}
       {/* ========================================================================= */}
-      {reassignModalOpen && selectedTrainee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in duration-200">
+      {reassignModalOpen && selectedTrainee && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 text-right space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
@@ -952,14 +1066,15 @@ export const TrainerDetailPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL 4: Edit Trainer Modal */}
       {/* ========================================================================= */}
-      {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in duration-200">
+      {editModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-zinc-200 text-right space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
@@ -1051,7 +1166,8 @@ export const TrainerDetailPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

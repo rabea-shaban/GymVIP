@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -89,6 +90,7 @@ export const SubscriptionRenewPage: React.FC = () => {
   const queryMemberId = searchParams.get('memberId')
   const { user } = useAuth()
   const toast = useToast()
+  const queryClient = useQueryClient()
 
   // Real Subscription & Plan states
   const [previousSubscription, setPreviousSubscription] = useState<SubscriptionItem | null>(null)
@@ -317,6 +319,10 @@ export const SubscriptionRenewPage: React.FC = () => {
         }
       }
 
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+
       setShowSuccessModal(true)
       toast.success('تم تجديد الاشتراك وتوثيق السداد بنجاح!')
       setTimeout(() => {
@@ -354,8 +360,8 @@ export const SubscriptionRenewPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-zinc-950 text-gym-gold flex items-center justify-center shrink-0 shadow-xs">
-              <RotateCcw className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <RotateCcw className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-zinc-950">تجديد الاشتراك</h1>
           </div>
@@ -821,7 +827,7 @@ export const SubscriptionRenewPage: React.FC = () => {
                       : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                   )}
                 >
-                  <Coins className="w-4 h-4 text-gym-gold" />
+                  <Coins className={cn('w-4 h-4 transition-colors', paymentMethod === 'CASH' ? 'text-white' : 'text-zinc-400')} />
                   <span>نقدي (كاش بالدرج)</span>
                 </button>
 
@@ -835,7 +841,7 @@ export const SubscriptionRenewPage: React.FC = () => {
                       : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                   )}
                 >
-                  <Wallet className="w-4 h-4 text-gym-gold" />
+                  <Wallet className={cn('w-4 h-4 transition-colors', paymentMethod === 'WALLET' ? 'text-white' : 'text-zinc-400')} />
                   <span>محفظة إلكترونية / إنستاباي</span>
                 </button>
               </div>

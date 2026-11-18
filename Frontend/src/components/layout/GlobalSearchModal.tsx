@@ -10,8 +10,14 @@ import {
   Settings,
   X,
   UserCheck,
+  Monitor,
+  Layers,
+  ShieldCheck,
+  Bell,
 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { useAuth } from '@/features/auth/context/AuthContext'
+import { UserRole } from '@/types'
 
 interface SearchItem {
   id: string
@@ -19,20 +25,158 @@ interface SearchItem {
   category: string
   url: string
   icon: React.ReactNode
+  roles?: UserRole[]
 }
 
 const SEARCH_ITEMS: SearchItem[] = [
-  { id: '1', title: 'لوحة التحكم', category: 'الرئيسية', url: '/app/dashboard', icon: <BarChart3 className="w-4 h-4" /> },
-  { id: '2', title: 'قائمة المشتركين', category: 'المشتركين', url: '/app/members', icon: <Users className="w-4 h-4" /> },
-  { id: '3', title: 'إضافة مشترك جديد', category: 'المشتركين', url: '/app/members/new', icon: <Users className="w-4 h-4" /> },
-  { id: '4', title: 'الاشتراكات الحالية', category: 'الاشتراكات', url: '/app/subscriptions', icon: <Award className="w-4 h-4" /> },
-  { id: '5', title: 'خطط العضوية والباقات', category: 'الاشتراكات', url: '/app/plans', icon: <Award className="w-4 h-4" /> },
-  { id: '6', title: 'تسجيل الحضور والانصراف', category: 'العمليات', url: '/app/attendance', icon: <CalendarCheck className="w-4 h-4" /> },
-  { id: '7', title: 'سجل المدفوعات والاشتراكات', category: 'العمليات', url: '/app/payments', icon: <CreditCard className="w-4 h-4" /> },
-  { id: '8', title: 'تسجيل دفعة جديدة', category: 'العمليات', url: '/app/payments/new', icon: <CreditCard className="w-4 h-4" /> },
-  { id: '9', title: 'طاقم المدربين', category: 'المدربين', url: '/app/trainers', icon: <UserCheck className="w-4 h-4" /> },
-  { id: '10', title: 'التقارير المالية والإحصائيات', category: 'التقارير', url: '/app/reports', icon: <BarChart3 className="w-4 h-4" /> },
-  { id: '11', title: 'إعدادات النظام والصالة', category: 'النظام', url: '/app/settings', icon: <Settings className="w-4 h-4" /> },
+  // Dashboard
+  {
+    id: '1',
+    title: 'لوحة التحكم الرئيسية',
+    category: 'الرئيسية',
+    url: '/app/dashboard',
+    icon: <BarChart3 className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER'],
+  },
+  {
+    id: '1-trainer',
+    title: 'لوحة تحكم المدرب',
+    category: 'الرئيسية',
+    url: '/app/trainer/dashboard',
+    icon: <BarChart3 className="w-4 h-4" />,
+    roles: ['TRAINER'],
+  },
+  {
+    id: '1-reception',
+    title: 'شاشة الاستقبال السريعة',
+    category: 'العمليات',
+    url: '/app/reception/dashboard',
+    icon: <Monitor className="w-4 h-4" />,
+    roles: ['RECEPTIONIST', 'OWNER', 'MANAGER'],
+  },
+
+  // Members
+  {
+    id: '2',
+    title: 'قائمة المشتركين',
+    category: 'المشتركين',
+    url: '/app/members',
+    icon: <Users className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+  {
+    id: '3',
+    title: 'إضافة مشترك جديد',
+    category: 'المشتركين',
+    url: '/app/members/new',
+    icon: <Users className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+
+  // Subscriptions & Plans
+  {
+    id: '4',
+    title: 'الاشتراكات الحالية',
+    category: 'الاشتراكات',
+    url: '/app/subscriptions',
+    icon: <Award className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+  {
+    id: '5',
+    title: 'خطط العضوية والباقات',
+    category: 'الاشتراكات',
+    url: '/app/plans',
+    icon: <Layers className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER'],
+  },
+
+  // Attendance
+  {
+    id: '6',
+    title: 'تسجيل الحضور والانصراف (الاستقبال)',
+    category: 'العمليات',
+    url: '/app/attendance',
+    icon: <CalendarCheck className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+
+  // Payments
+  {
+    id: '7',
+    title: 'سجل المدفوعات والاشتراكات',
+    category: 'العمليات',
+    url: '/app/payments',
+    icon: <CreditCard className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+  {
+    id: '8',
+    title: 'تسجيل دفعة جديدة',
+    category: 'العمليات',
+    url: '/app/payments/new',
+    icon: <CreditCard className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+
+  // Trainers & Trainees
+  {
+    id: '9',
+    title: 'طاقم المدربين',
+    category: 'المدربين',
+    url: '/app/trainers',
+    icon: <UserCheck className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+  },
+  {
+    id: '9-trainees',
+    title: 'متدربيني (قائمة المتدربين المسندين)',
+    category: 'التدريب',
+    url: '/app/trainer/trainees',
+    icon: <Users className="w-4 h-4" />,
+    roles: ['TRAINER'],
+  },
+  {
+    id: '9-attendance',
+    title: 'حضور متدربيني وتسجيل التمارين',
+    category: 'التدريب',
+    url: '/app/trainer/attendance',
+    icon: <CalendarCheck className="w-4 h-4" />,
+    roles: ['TRAINER'],
+  },
+
+  // Reports, Admin, Settings
+  {
+    id: '10',
+    title: 'التقارير المالية والإحصائيات',
+    category: 'التقارير',
+    url: '/app/reports',
+    icon: <BarChart3 className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER'],
+  },
+  {
+    id: '11',
+    title: 'إدارة المستخدمين والصلاحيات',
+    category: 'الإدارة',
+    url: '/app/users',
+    icon: <ShieldCheck className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER'],
+  },
+  {
+    id: '12',
+    title: 'الإشعارات والتنبيهات',
+    category: 'النظام',
+    url: '/app/notifications',
+    icon: <Bell className="w-4 h-4" />,
+  },
+  {
+    id: '13',
+    title: 'إعدادات النظام والصالة',
+    category: 'النظام',
+    url: '/app/settings',
+    icon: <Settings className="w-4 h-4" />,
+    roles: ['OWNER', 'MANAGER'],
+  },
 ]
 
 export interface GlobalSearchModalProps {
@@ -43,6 +187,8 @@ export interface GlobalSearchModalProps {
 export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const currentRole = user?.role || 'TRAINER'
 
   useEffect(() => {
     if (!isOpen) {
@@ -50,9 +196,12 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
     }
   }, [isOpen])
 
-  const filteredItems = SEARCH_ITEMS.filter((item) =>
-    item.title.includes(query) || item.category.includes(query)
-  )
+  const filteredItems = SEARCH_ITEMS.filter((item) => {
+    if (item.roles && !item.roles.includes(currentRole as UserRole)) {
+      return false
+    }
+    return item.title.includes(query) || item.category.includes(query)
+  })
 
   const handleSelect = (url: string) => {
     navigate(url)
@@ -92,7 +241,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                 className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-zinc-100/80 text-right transition-colors group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-md bg-zinc-100 text-zinc-600 group-hover:bg-gym-black group-hover:text-gym-gold flex items-center justify-center transition-colors">
+                  <div className="w-8 h-8 rounded-md bg-zinc-100 text-zinc-600 group-hover:bg-gym-black group-hover:text-white flex items-center justify-center transition-colors">
                     {item.icon}
                   </div>
                   <span className="text-sm font-medium text-zinc-800 group-hover:text-zinc-900">

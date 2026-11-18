@@ -5,7 +5,7 @@ import {
   CreditCard,
   CalendarCheck,
   Award,
-  Sparkles,
+  Bell,
   Plus,
   Edit,
   MoreVertical,
@@ -178,7 +178,7 @@ export const DesignSystemPage: React.FC = () => {
             <Button
               variant="gold"
               size="md"
-              startIcon={<Sparkles className="w-4 h-4 text-gym-black" />}
+              startIcon={<Bell className="w-4 h-4 text-gym-black" />}
               onClick={() => toast.success('GymVIP Design System', 'تم تفعيل وتوثيق كافة المكونات بنجاح')}
             >
               اختبار الإشعار

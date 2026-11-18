@@ -1,17 +1,18 @@
 import { z } from 'zod'
+import { normalizeEgyptianPhone } from './member.validator.js'
 
-const EGYPTIAN_PHONE_REGEX = /^(?:\+?20|0020)?0?1[0125][0-9]{8}$/
+const EGYPTIAN_PHONE_REGEX = /^01[0125][0-9]{8}$/
 
 export const createTrainerSchema = z.object({
   name: z
-    .string({ required_error: 'اسم المدرب مطلوب / Name is required' })
+    .string({ required_error: 'اسم المدرب مطلوب / Trainer name is required' })
     .trim()
-    .min(2, 'يجب أن يتكون الاسم من حرفين على الأقل / Name must be at least 2 characters')
-    .max(100, 'الاسم طويل جداً (الحد الأقصى 100 حرف)'),
+    .min(2, 'يجب أن يتكون اسم المدرب من حرفين على الأقل / Name must be at least 2 characters')
+    .max(100, 'اسم المدرب طويل جداً (الحد الأقصى 100 حرف)'),
   email: z
     .string({ required_error: 'البريد الإلكتروني مطلوب / Email is required' })
     .trim()
-    .email('صيغة البريد الإلكتروني غير صحيحة / Invalid email format')
+    .email('صيغة البريد الإلكتروني غير صحيحة (مثال: trainer@gymvip.com) / Invalid email format')
     .toLowerCase(),
   password: z
     .string({ required_error: 'كلمة المرور مطلوبة / Password is required' })
@@ -21,11 +22,15 @@ export const createTrainerSchema = z.object({
       'يجب أن تحتوي كلمة المرور على أحرف وأرقام معاً / Password must contain both letters and numbers'
     ),
   phone: z
-    .string({ required_error: 'رقم الهاتف مطلوب / Phone is required' })
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
+    .any({ required_error: 'رقم الهاتف مطلوب / Phone is required' })
+    .transform(normalizeEgyptianPhone)
+    .pipe(
+      z
+        .string()
+        .regex(
+          EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح مكون من 11 رقماً يبدأ بـ 01 (مثال: 01012345678)'
+        )
     ),
   specialization: z
     .string()
@@ -47,30 +52,39 @@ export const updateTrainerSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, 'يجب أن يتكون الاسم من حرفين على الأقل / Name must be at least 2 characters')
-    .max(100, 'الاسم طويل جداً')
+    .min(2, 'يجب أن يتكون اسم المدرب من حرفين على الأقل / Name must be at least 2 characters')
+    .max(100, 'اسم المدرب طويل جداً')
     .optional(),
   phone: z
-    .string()
-    .trim()
-    .regex(
-      EGYPTIAN_PHONE_REGEX,
-      'يرجى إدخال رقم هاتف محمول مصري صحيح (مثال: 01012345678) / Invalid Egyptian phone number'
-    )
+    .any()
     .optional()
     .nullable()
-    .or(z.literal('')),
+    .transform((val) => {
+      if (val === undefined) return undefined
+      if (val === null || String(val).trim() === '') return null
+      return normalizeEgyptianPhone(val)
+    })
+    .pipe(
+      z
+        .string()
+        .regex(
+          EGYPTIAN_PHONE_REGEX,
+          'يرجى إدخال رقم هاتف محمول مصري صحيح مكون من 11 رقماً يبدأ بـ 01 (مثال: 01012345678)'
+        )
+        .optional()
+        .nullable()
+    ),
   specialization: z
     .string()
     .trim()
-    .max(150, 'التخصص طويل جداً')
+    .max(150, 'التخصص طويل جداً (الحد الأقصى 150 حرف)')
     .optional()
     .nullable()
     .or(z.literal('')),
   bio: z
     .string()
     .trim()
-    .max(1000, 'النبذة التعريفية طويلة جداً')
+    .max(1000, 'النبذة التعريفية طويلة جداً (الحد الأقصى 1000 حرف)')
     .optional()
     .nullable()
     .or(z.literal('')),

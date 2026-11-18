@@ -271,28 +271,31 @@ export async function getDashboardOverview(
     prisma.member.findMany({
       where: { gymId },
       orderBy: { createdAt: 'desc' },
-      take: 4,
+      take: 10,
       select: { id: true, name: true, memberCode: true, createdAt: true },
     }),
     prisma.subscription.findMany({
       where: { gymId },
       orderBy: { createdAt: 'desc' },
-      take: 4,
-      include: { member: { select: { name: true } } },
+      take: 10,
+      include: { member: { select: { id: true, name: true } } },
     }),
     canViewFinancials
       ? prisma.payment.findMany({
           where: { gymId },
           orderBy: { createdAt: 'desc' },
-          take: 4,
-          include: { member: { select: { name: true } } },
+          take: 10,
+          include: {
+            member: { select: { id: true, name: true } },
+            subscription: { select: { id: true, planName: true } },
+          },
         })
       : Promise.resolve([]),
     prisma.attendance.findMany({
       where: { gymId },
       orderBy: { checkInAt: 'desc' },
-      take: 4,
-      include: { member: { select: { name: true } } },
+      take: 10,
+      include: { member: { select: { id: true, name: true } } },
     }),
   ])
 
@@ -334,7 +337,7 @@ export async function getDashboardOverview(
       title: 'دفعة مالية مستلمة',
       description: `تم تحصيل ${Number(p.amount).toFixed(0)} ج.م من العضو "${p.member?.name || 'العضو'}"`,
       timestamp: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
-      entityId: p.id,
+      entityId: p.subscriptionId || p.id,
     })
   })
 
@@ -345,7 +348,7 @@ export async function getDashboardOverview(
       title: 'تسجيل دخول',
       description: `حضور العضو "${a.member?.name || 'العضو'}" إلى الصالة الرياضية`,
       timestamp: a.checkInAt instanceof Date ? a.checkInAt.toISOString() : String(a.checkInAt),
-      entityId: a.id,
+      entityId: a.member?.id || a.id,
     })
   })
 
@@ -365,7 +368,7 @@ export async function getDashboardOverview(
       member: { isActive: true },
     },
     include: {
-      member: { select: { id: true, name: true, memberCode: true, phone: true } },
+      member: { select: { id: true, name: true, memberCode: true, phone: true, avatarUrl: true } },
     },
     orderBy: { endDate: 'asc' },
     take: 10,
@@ -382,6 +385,7 @@ export async function getDashboardOverview(
       memberName: sub.member.name,
       memberCode: sub.member.memberCode,
       memberPhone: sub.member.phone,
+      memberAvatarUrl: sub.member.avatarUrl ?? null,
       planName: sub.planName,
       endDate:
         (sub.endDate instanceof Date

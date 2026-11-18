@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Users,
@@ -17,6 +18,7 @@ import {
   MessageCircle,
   Maximize2,
 } from 'lucide-react'
+import { Avatar } from '@/components/ui/Avatar'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { dashboardApi } from '@/features/dashboard/services/dashboardApi'
 import { attendanceApi } from '@/features/attendance/services/attendanceApi'
@@ -24,6 +26,7 @@ import { membersApi } from '@/features/members/services/membersApi'
 import type { DashboardOverviewData } from '@/features/dashboard/types/dashboard.types'
 import type { AttendanceItem } from '@/features/attendance/types/attendance.types'
 import type { MemberItem } from '@/features/members/types/member.types'
+import { useRealtimeSync } from '@/services/socket'
 
 export const TrainerDashboardPage: React.FC = () => {
   const navigate = useNavigate()
@@ -71,6 +74,11 @@ export const TrainerDashboardPage: React.FC = () => {
     return () => clearInterval(interval)
   }, [])
 
+  // Instant Real-Time WebSocket sync for Trainer Dashboard
+  useRealtimeSync(undefined, () => {
+    loadData()
+  })
+
   // Filtered trainees for the bottom table
   const filteredMembers = useMemo(() => {
     if (!searchQuery.trim()) return members
@@ -83,7 +91,7 @@ export const TrainerDashboardPage: React.FC = () => {
     )
   }, [members, searchQuery])
 
-  const currentDateFormatted = new Date().toLocaleDateString('ar-EG', {
+  const currentDateFormatted = new Date().toLocaleDateString('ar-EG-u-nu-latn', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -121,7 +129,6 @@ export const TrainerDashboardPage: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 tracking-tight flex items-center gap-2">
               <span>أهلاً بك، كابتن {user?.name || 'المدرب'}</span>
-              <span className="inline-block animate-bounce">👋</span>
             </h1>
             <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-[#FAF0D3] text-[#7E6517] border border-[#ECD9A2]">
               مدرب معتمد
@@ -588,14 +595,17 @@ export const TrainerDashboardPage: React.FC = () => {
       </div>
 
       {/* Trainee Quick Profile Modal */}
-      {selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in">
+      {selectedMember && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 space-y-4 text-right animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-zinc-950 text-white flex items-center justify-center font-bold text-sm">
-                  {selectedMember.name.slice(0, 2)}
-                </div>
+                <Avatar
+                  src={selectedMember.avatarUrl || undefined}
+                  name={selectedMember.name}
+                  size="md"
+                  className="w-12 h-12 ring-2 ring-gym-gold/40 border border-zinc-200 shrink-0"
+                />
                 <div>
                   <h3 className="text-base font-bold text-zinc-950">{selectedMember.name}</h3>
                   <div className="text-xs text-zinc-400 font-mono">كود: {selectedMember.memberCode}</div>
@@ -620,7 +630,7 @@ export const TrainerDashboardPage: React.FC = () => {
                 <span className="text-zinc-500">تاريخ انتهاء الاشتراك:</span>
                 <span className="font-bold text-zinc-900">
                   {selectedMember.currentSubscription?.endDate
-                    ? new Date(selectedMember.currentSubscription.endDate).toLocaleDateString('ar-EG', {
+                    ? new Date(selectedMember.currentSubscription.endDate).toLocaleDateString('ar-EG-u-nu-latn', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
@@ -665,7 +675,8 @@ export const TrainerDashboardPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

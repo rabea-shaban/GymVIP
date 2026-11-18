@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -28,6 +29,7 @@ export const PaymentCreatePage: React.FC = () => {
   const querySubId = searchParams.get('subscriptionId')
   const queryMemberId = searchParams.get('memberId')
   const toast = useToast()
+  const queryClient = useQueryClient()
 
   // Real Subscriptions / Loading state
   const [subscriptionsList, setSubscriptionsList] = useState<SubscriptionItem[]>([])
@@ -177,6 +179,9 @@ export const PaymentCreatePage: React.FC = () => {
       })
 
       setShowConfirmModal(false)
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
       toast.success(`تم تحصيل مبلغ ${paidAmount} ج.م بنجاح!`)
       setTimeout(() => {
         navigate(`/app/payments/${created.id}`)

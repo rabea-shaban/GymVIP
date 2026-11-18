@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, UserPlus, CreditCard, CalendarCheck, Award, ChevronDown } from 'lucide-react'
+import { Plus, UserPlus, CreditCard, CalendarCheck, Award, ChevronDown, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
+import { UserRole } from '@/types'
 
 export const QuickActionsMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const currentRole = user?.role || 'OWNER'
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -19,32 +23,60 @@ export const QuickActionsMenu: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const actions = [
+  const ALL_ACTIONS: Array<{
+    title: string
+    subtitle: string
+    icon: React.ReactNode
+    path: string
+    roles?: UserRole[]
+  }> = [
     {
       title: 'إضافة مشترك جديد',
       subtitle: 'تسجيل عضو وبياناته الشخصية',
       icon: <UserPlus className="w-4 h-4 text-gym-gold" />,
       path: '/app/members/new',
+      roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
     },
     {
       title: 'تسجيل دفعة نقدية / إلكترونية',
       subtitle: 'تحصيل اشتراك نقداً أو فودافون كاش',
       icon: <CreditCard className="w-4 h-4 text-emerald-500" />,
       path: '/app/payments/new',
+      roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
     },
     {
       title: 'تسجيل حضور عضو',
       subtitle: 'إثبات حضور سريع بالهاتف أو الكود',
       icon: <CalendarCheck className="w-4 h-4 text-blue-500" />,
       path: '/app/attendance',
+      roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
+    },
+    {
+      title: 'تسجيل حضور متدرب',
+      subtitle: 'إثبات حضور سريع لبدء التمرين',
+      icon: <CalendarCheck className="w-4 h-4 text-gym-gold" />,
+      path: '/app/trainer/attendance',
+      roles: ['TRAINER'],
+    },
+    {
+      title: 'متابعة المتدربين',
+      subtitle: 'استعراض بيانات المتدربين والتمارين',
+      icon: <Users className="w-4 h-4 text-amber-500" />,
+      path: '/app/trainer/trainees',
+      roles: ['TRAINER'],
     },
     {
       title: 'إضافة اشتراك جديد',
       subtitle: 'تجديد أو ربط اشتراك بباقة',
       icon: <Award className="w-4 h-4 text-amber-500" />,
       path: '/app/subscriptions/new',
+      roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'],
     },
   ]
+
+  const actions = ALL_ACTIONS.filter(
+    (act) => !act.roles || act.roles.includes(currentRole as UserRole)
+  )
 
   const handleNavigate = (path: string) => {
     navigate(path)

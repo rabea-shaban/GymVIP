@@ -12,18 +12,21 @@ import type {
 } from '../types/auth.types.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { saveBase64Image, deleteStoredImage } from '../utils/fileStorage.util.js'
 
 export const formatSafeUser = (user: {
   id: string
   name: string
   email: string
   phone: string | null
+  avatarUrl?: string | null
   role: Role
 }): SafeUser => ({
   id: user.id,
   name: user.name,
   email: user.email,
   phone: user.phone,
+  avatarUrl: user.avatarUrl ?? null,
   role: user.role,
 })
 
@@ -33,12 +36,32 @@ export const formatSafeGym = (gym: {
   slug: string
   city: string | null
   currency: string
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  logo?: string | null
+  subscriptionReminderEnabled?: boolean | null
+  subscriptionFreezeEnabled?: boolean | null
+  allowedFreezeDurations?: unknown
+  maxFreezeDays?: number | null
+  allowManualCheckout?: boolean | null
 }): SafeGym => ({
   id: gym.id,
   name: gym.name,
   slug: gym.slug,
   city: gym.city,
   currency: gym.currency,
+  phone: gym.phone ?? null,
+  email: gym.email ?? null,
+  address: gym.address ?? null,
+  logo: gym.logo ?? null,
+  subscriptionReminderEnabled: gym.subscriptionReminderEnabled ?? true,
+  subscriptionFreezeEnabled: gym.subscriptionFreezeEnabled ?? true,
+  allowedFreezeDurations: Array.isArray(gym.allowedFreezeDurations)
+    ? (gym.allowedFreezeDurations as number[])
+    : [3, 7, 15, 30],
+  maxFreezeDays: gym.maxFreezeDays ?? 90,
+  allowManualCheckout: gym.allowManualCheckout ?? true,
 })
 
 /**
@@ -208,5 +231,56 @@ export const getCurrentUserProfile = async (
   return {
     user: formatSafeUser(user),
     gym: formatSafeGym(user.gym),
+  }
+}
+
+/**
+ * Updates the profile (name, phone, avatar) of the currently authenticated user
+ */
+export const updateUserProfile = async (
+  userId: string,
+  input: { name?: string; phone?: string | null; avatarUrl?: string | null }
+): Promise<AuthSuccessData> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { gym: true },
+  })
+
+  if (!user || !user.isActive) {
+    throw AppError.unauthorized('المستخدم غير موجود أو تم تعطيل الحساب')
+  }
+
+  let finalAvatarUrl = user.avatarUrl
+  if (input.avatarUrl !== undefined) {
+    if (input.avatarUrl) {
+      finalAvatarUrl = await saveBase64Image(input.avatarUrl, 'users', `user-${user.id}`)
+      if (
+        user.avatarUrl &&
+        user.avatarUrl !== finalAvatarUrl &&
+        user.avatarUrl.startsWith('/uploads/')
+      ) {
+        await deleteStoredImage(user.avatarUrl)
+      }
+    } else {
+      finalAvatarUrl = null
+      if (user.avatarUrl?.startsWith('/uploads/')) {
+        await deleteStoredImage(user.avatarUrl)
+      }
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.phone !== undefined && { phone: input.phone || null }),
+      ...(input.avatarUrl !== undefined && { avatarUrl: finalAvatarUrl }),
+    },
+    include: { gym: true },
+  })
+
+  return {
+    user: formatSafeUser(updatedUser),
+    gym: formatSafeGym(updatedUser.gym),
   }
 }

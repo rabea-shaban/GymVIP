@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { SubscriptionStatus } from '@prisma/client'
+import { parseDateFlexible } from './member.validator.js'
 
 export const createSubscriptionSchema = z
   .object({
@@ -10,10 +11,12 @@ export const createSubscriptionSchema = z
       .string({ required_error: 'معرف الباقة مطلوب / planId is required' })
       .min(1, 'معرف الباقة مطلوب'),
     startDate: z
-      .string()
+      .any()
       .optional()
-      .refine((val) => !val || !isNaN(Date.parse(val)), {
-        message: 'تاريخ البداية غير صالح / Invalid start date format',
+      .nullable()
+      .transform((val) => {
+        if (!val || String(val).trim() === '') return undefined
+        return parseDateFlexible(val) || undefined
       }),
     notes: z
       .string()
@@ -47,7 +50,7 @@ export const subscriptionIdParamSchema = z.object({
 })
 
 export const freezeSubscriptionSchema = z.object({
-  days: z
+  days: z.coerce
     .number({ required_error: 'عدد أيام التجميد مطلوب / Freeze days is required' })
     .int('عدد الأيام يجب أن يكون عدداً صحيحاً / Days must be an integer')
     .min(1, 'عدد الأيام يجب أن يكون يوماً واحداً على الأقل / Minimum 1 day')
@@ -59,40 +62,29 @@ export const freezeSubscriptionSchema = z.object({
     .nullable(),
 })
 
-export const renewSubscriptionSchema = z.object({
-  planId: z
-    .string({ required_error: 'معرف الباقة مطلوب / planId is required' })
-    .min(1, 'معرف الباقة مطلوب'),
-  startDate: z
+export const cancelSubscriptionSchema = z.object({
+  reason: z
     .string()
-    .optional()
-    .nullable()
-    .refine((val) => !val || !isNaN(Date.parse(val)), {
-      message: 'تاريخ البداية غير صالح / Invalid start date format',
-    }),
-  notes: z
-    .string()
-    .max(1000, 'الملاحظات يجب ألا تتجاوز 1000 حرف / Notes cannot exceed 1000 characters')
+    .max(500, 'سبب الإلغاء يجب ألا يتجاوز 500 حرف / Reason cannot exceed 500 characters')
     .optional()
     .nullable(),
 })
 
-export const cancelSubscriptionSchema = z
-  .object({
-    reason: z
-      .string({ required_error: 'سبب الإلغاء مطلوب / Cancellation reason is required' })
-      .trim()
-      .min(3, 'سبب الإلغاء يجب أن يتكون من 3 أحرف على الأقل / Cancellation reason must be at least 3 characters')
-      .max(250, 'سبب الإلغاء يجب ألا يتجاوز 250 حرفاً / Cancellation reason must not exceed 250 characters'),
-    notes: z
-      .string()
-      .trim()
-      .max(1000, 'الملاحظات يجب ألا تتجاوز 1000 حرف / Notes cannot exceed 1000 characters')
-      .optional()
-      .nullable(),
-  })
-  .strict({
-    message: 'الحقول المرسلة غير صالحة / Unknown or unsupported fields',
-  })
+export const renewSubscriptionSchema = z.object({
+  planId: z.string().min(1, 'معرف الباقة مطلوب').optional(),
+  startDate: z
+    .any()
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (!val || String(val).trim() === '') return undefined
+      return parseDateFlexible(val) || undefined
+    }),
+  notes: z.string().max(1000).optional().nullable(),
+})
 
+export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>
+export type SubscriptionQueryParams = z.infer<typeof subscriptionQuerySchema>
+export type FreezeSubscriptionInput = z.infer<typeof freezeSubscriptionSchema>
 export type CancelSubscriptionInput = z.infer<typeof cancelSubscriptionSchema>
+export type RenewSubscriptionInput = z.infer<typeof renewSubscriptionSchema>

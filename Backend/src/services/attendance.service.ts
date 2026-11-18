@@ -14,6 +14,7 @@ import type {
 } from '../types/attendance.types.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 
 function mapAttendanceToDto(record: any): AttendanceDto {
   return {
@@ -33,6 +34,7 @@ function mapAttendanceToDto(record: any): AttendanceDto {
           phone: record.member.phone,
           memberCode: record.member.memberCode,
           email: record.member.email ?? null,
+          avatarUrl: record.member.avatarUrl ?? null,
         }
       : undefined,
     subscription: record.subscription
@@ -150,6 +152,7 @@ export async function checkInMember(
             phone: true,
             memberCode: true,
             email: true,
+            avatarUrl: true,
           },
         },
         subscription: {
@@ -177,6 +180,13 @@ export async function checkInMember(
     entityId: result.id,
     description: `تسجيل حضور للعضو (${result.member?.name || 'العضو'})`,
     afterData: result,
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.ATTENDANCE_CHECK_IN, {
+    attendance: result,
+    memberId: result.memberId,
+    memberName: result.member?.name,
   })
 
   return result
@@ -229,6 +239,7 @@ export async function checkOutAttendance(
           phone: true,
           memberCode: true,
           email: true,
+          avatarUrl: true,
         },
       },
       subscription: {
@@ -255,6 +266,13 @@ export async function checkOutAttendance(
     entityId: dto.id,
     description: `تسجيل انصراف للعضو (${dto.member?.name || 'العضو'}) بعد مدة (${dto.durationMinutes}) دقيقة`,
     afterData: dto,
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.ATTENDANCE_CHECK_OUT, {
+    attendance: dto,
+    memberId: dto.memberId,
+    memberName: dto.member?.name,
   })
 
   return dto
@@ -320,6 +338,7 @@ export async function getMemberCurrentAttendance(
           phone: true,
           memberCode: true,
           email: true,
+          avatarUrl: true,
         },
       },
       subscription: {
@@ -400,6 +419,7 @@ export async function getAttendanceList(
             phone: true,
             memberCode: true,
             email: true,
+            avatarUrl: true,
           },
         },
         subscription: {
@@ -493,6 +513,7 @@ export async function getCurrentlyInside(gymId: string): Promise<AttendanceDto[]
           phone: true,
           memberCode: true,
           email: true,
+          avatarUrl: true,
         },
       },
       subscription: {
@@ -529,6 +550,7 @@ export async function getAttendanceById(
           phone: true,
           memberCode: true,
           email: true,
+          avatarUrl: true,
         },
       },
       subscription: {
@@ -581,6 +603,7 @@ export async function getMemberAttendanceHistory(
           phone: true,
           memberCode: true,
           email: true,
+          avatarUrl: true,
         },
       },
       subscription: {

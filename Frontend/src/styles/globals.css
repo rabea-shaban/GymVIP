@@ -67,3 +67,133 @@
     background: #3F3F46;
   }
 }
+
+/* ==========================================================================
+   GymVIP Luxury SweetAlert2 Dark & Gold Theme
+   ========================================================================== */
+.swal2-container.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.gym-swal-popup {
+  background: #111114 !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 35px rgba(212, 175, 55, 0.15) !important;
+  padding: 28px 24px !important;
+  font-family: 'Cairo', sans-serif !important;
+  color: #ffffff !important;
+}
+
+.gym-swal-title {
+  color: #ffffff !important;
+  font-size: 21px !important;
+  font-weight: 900 !important;
+  font-family: 'Cairo', sans-serif !important;
+  margin-top: 8px !important;
+  margin-bottom: 4px !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+.gym-swal-html {
+  color: #e4e4e7 !important;
+  font-family: 'Cairo', sans-serif !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.gym-swal-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  margin-top: 24px !important;
+  width: 100% !important;
+}
+
+.gym-swal-confirm-btn {
+  background: linear-gradient(135deg, #F3D372 0%, #D4AF37 50%, #B8941F 100%) !important;
+  color: #000000 !important;
+  font-family: 'Cairo', sans-serif !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+  padding: 12px 26px !important;
+  border-radius: 14px !important;
+  border: none !important;
+  box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  text-decoration: none !important;
+}
+
+.gym-swal-confirm-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 22px rgba(212, 175, 55, 0.5) !important;
+  filter: brightness(1.05) !important;
+}
+
+.gym-swal-confirm-btn:active {
+  transform: translateY(1px) !important;
+}
+
+.gym-swal-cancel-btn {
+  background: #1c1c21 !important;
+  color: #e4e4e7 !important;
+  font-family: 'Cairo', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  padding: 12px 22px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  text-decoration: none !important;
+}
+
+.gym-swal-cancel-btn:hover {
+  background: #27272f !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Success Icon Dark Theme Mask Fix */
+.gym-swal-popup .swal2-icon.swal2-success {
+  border-color: #D4AF37 !important;
+  color: #D4AF37 !important;
+  margin: 8px auto 16px auto !important;
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.2) !important;
+}
+
+.gym-swal-popup .swal2-icon.swal2-success .swal2-success-ring {
+  border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.gym-swal-popup .swal2-icon.swal2-success [class^='swal2-success-line'] {
+  background-color: #D4AF37 !important;
+}
+
+.gym-swal-popup .swal2-icon.swal2-success .swal2-success-circular-line-left,
+.gym-swal-popup .swal2-icon.swal2-success .swal2-success-circular-line-right,
+.gym-swal-popup .swal2-icon.swal2-success .swal2-success-fix {
+  background-color: #111114 !important;
+}
+
+/* Error Icon */
+.gym-swal-popup .swal2-icon.swal2-error {
+  border-color: #f43f5e !important;
+  color: #f43f5e !important;
+  margin: 8px auto 16px auto !important;
+}
+
+.gym-swal-popup .swal2-icon.swal2-error [class^='swal2-x-mark-line'] {
+  background-color: #f43f5e !important;
+}

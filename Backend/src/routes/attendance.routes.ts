@@ -12,9 +12,9 @@ import {
 
 const router = Router()
 
-// All attendance routes require authentication and staff roles (OWNER, MANAGER, RECEPTIONIST)
+// All attendance routes require authentication and staff roles (OWNER, MANAGER, RECEPTIONIST, TRAINER)
 router.use(requireAuth)
-router.use(requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST))
+router.use(requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST, Role.TRAINER))
 
 /**
  * @route   POST /api/v1/attendance/check-in

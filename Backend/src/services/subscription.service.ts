@@ -21,6 +21,7 @@ import type {
 } from '../types/subscription.types.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 
 export function formatSubscriptionDto(subscription: any, userRole?: Role): SubscriptionDto {
   const effectiveStatus = getEffectiveSubscriptionStatus(subscription)
@@ -80,6 +81,7 @@ export function formatSubscriptionDto(subscription: any, userRole?: Role): Subsc
           phone: subscription.member.phone,
           memberCode: subscription.member.memberCode,
           email: subscription.member.email ?? null,
+          avatarUrl: subscription.member.avatarUrl ?? null,
           isActive: subscription.member.isActive,
         }
       : undefined,
@@ -185,6 +187,12 @@ export async function createSubscription(
     entityId: created.id,
     description: `تم إنشاء اشتراك جديد للعضو (${member.name}) في باقة (${plan.name})`,
     afterData: dto,
+  })
+
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.SUBSCRIPTION_CREATED, {
+    subscription: dto,
+    memberId: member.id,
   })
 
   return dto
@@ -527,6 +535,12 @@ export async function freezeSubscription(
     afterData: result.subscription,
   })
 
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.SUBSCRIPTION_FROZEN, {
+    subscription: result.subscription,
+    memberId: result.subscription.memberId,
+  })
+
   return result
 }
 
@@ -679,6 +693,12 @@ export async function renewSubscription(
     afterData: result,
   })
 
+  // Emit real-time event across the gym
+  emitGymEvent(gymId, REALTIME_EVENTS.SUBSCRIPTION_RENEWED, {
+    subscription: result,
+    memberId: result.memberId,
+  })
+
   return result
 }
 
@@ -804,6 +824,13 @@ export async function cancelSubscription(
     })
 
     return formatSubscriptionDto(updated, userRole)
+  })
+
+  // 6. Broadcast real-time cancellation
+  emitGymEvent(gymId, REALTIME_EVENTS.SUBSCRIPTION_CANCELLED, {
+    subscriptionId: result.id,
+    memberId: result.memberId,
+    status: result.status,
   })
 
   return result

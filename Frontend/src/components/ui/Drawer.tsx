@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -57,8 +58,8 @@ export const Drawer: React.FC<DrawerProps> = ({
     left: 'left-0 top-0 bottom-0 animate-in slide-in-from-left duration-300',
   }
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] overflow-hidden">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
@@ -67,7 +68,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 
       <div
         className={cn(
-          'fixed z-50 h-full w-full bg-white shadow-2xl flex flex-col text-right',
+          'fixed z-[9999] h-full w-full bg-white shadow-2xl flex flex-col text-right',
           sizeClasses[size],
           positionClasses[position],
           className
@@ -96,6 +97,7 @@ export const Drawer: React.FC<DrawerProps> = ({
         {/* Body */}
         <div className="flex-1 p-5 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

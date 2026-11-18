@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   User,
@@ -12,7 +12,6 @@ import {
   LogOut,
   Laptop,
   AlertTriangle,
-  Star,
   Check,
   Upload,
   Eye,
@@ -22,19 +21,31 @@ import {
   X,
   CircleAlert,
   Loader2,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/context/AuthContext'
+import { authApi } from '@/features/auth/services/authApi'
 import { usersApi } from '@/features/users/services/usersApi'
+import {
+  validateName,
+  validateEgyptianPhone,
+  validatePassword,
+  extractBackendErrors,
+} from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
+import { cn } from '@/lib/utils'
+import { getMediaUrl } from '@/lib/media'
 
 export const ProfilePage: React.FC = () => {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, gym, logout, updateUserData } = useAuth()
 
   // Profile Form States
   const [fullName, setFullName] = useState(user?.name || '')
   const [phone, setPhone] = useState(user?.phone || '')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({})
 
   // Password Form States
   const [newPassword, setNewPassword] = useState('')
@@ -42,18 +53,24 @@ export const ProfilePage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
 
-  // Modals Open State
+  // Modals & Photo Upload States
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
-  const [avatarImage, setAvatarImage] = useState<string | null>(null)
+  const [avatarImage, setAvatarImage] = useState<string | null>(user?.avatarUrl || null)
+  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (user) {
       setFullName(user.name)
       setPhone(user.phone || '')
+      setAvatarImage(user.avatarUrl || null)
     }
   }, [user])
 
@@ -69,30 +86,186 @@ export const ProfilePage: React.FC = () => {
   const isMinLength = newPassword.length >= 8
   const isMatching = newPassword !== '' && newPassword === confirmPassword
 
+  const handleNameChange = (val: string) => {
+    setFullName(val)
+    setHasUnsavedChanges(true)
+    if (!val.trim()) {
+      setProfileErrors((prev) => ({ ...prev, name: 'الاسم بالكامل مطلوب' }))
+    } else {
+      const res = validateName(val, 'الاسم بالكامل', 2, 100)
+      setProfileErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    setHasUnsavedChanges(true)
+    if (!val.trim()) {
+      setProfileErrors((prev) => ({ ...prev, phone: '' }))
+      return
+    }
+    const res = validateEgyptianPhone(val, false, 'رقم الهاتف')
+    setProfileErrors((prev) => ({ ...prev, phone: res.isValid ? '' : (res.error || '') }))
+  }
+
+  const handleNewPasswordChange = (val: string) => {
+    setNewPassword(val)
+    if (!val) {
+      setPasswordErrors((prev) => ({ ...prev, newPassword: '' }))
+      return
+    }
+    const res = validatePassword(val, true)
+    setPasswordErrors((prev) => ({
+      ...prev,
+      newPassword: res.isValid ? '' : (res.error || ''),
+      confirmPassword: confirmPassword && val !== confirmPassword ? 'كلمتا المرور غير متطابقتين' : ''
+    }))
+  }
+
+  const handleConfirmPasswordChange = (val: string) => {
+    setConfirmPassword(val)
+    if (!val) {
+      setPasswordErrors((prev) => ({ ...prev, confirmPassword: '' }))
+      return
+    }
+    setPasswordErrors((prev) => ({
+      ...prev,
+      confirmPassword: newPassword !== val ? 'كلمتا المرور غير متطابقتين' : ''
+    }))
+  }
+
+  const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('يرجى اختيار ملف صورة صالح (JPG أو PNG أو WebP)'))
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        reject(new Error('حجم الصورة كبير جداً، الحد الأقصى 5 ميجابايت'))
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const maxDim = 400
+          let width = img.width
+          let height = img.height
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width)
+              width = maxDim
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height)
+              height = maxDim
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height)
+            resolve(canvas.toDataURL('image/jpeg', 0.85))
+          } else {
+            resolve(event.target?.result as string)
+          }
+        }
+        img.onerror = () => reject(new Error('تعذر قراءة الصورة'))
+        img.src = event.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('تعذر قراءة ملف الصورة'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const dataUrl = await processImageFile(file)
+      setPendingAvatar(dataUrl)
+    } catch (err: any) {
+      triggerToast(err.message || 'فشل تحميل الصورة', 'error')
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleOpenPhotoModal = () => {
+    setPendingAvatar(avatarImage)
+    setPhotoModalOpen(true)
+  }
+
+  const handleSavePhoto = async () => {
+    if (!user) return
+    try {
+      setIsUploadingPhoto(true)
+      const res = await authApi.updateProfile({
+        avatarUrl: pendingAvatar,
+      })
+      setAvatarImage(pendingAvatar)
+      updateUserData({
+        avatarUrl: res.user.avatarUrl || undefined,
+      })
+      setPhotoModalOpen(false)
+      triggerToast(pendingAvatar ? 'تم تحديث الصورة الشخصية بنجاح!' : 'تمت إزالة الصورة الشخصية بنجاح!')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'تعذر حفظ الصورة الشخصية'
+      triggerToast(msg, 'error')
+    } finally {
+      setIsUploadingPhoto(false)
+    }
+  }
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
 
+    const errs: Record<string, string> = {}
+    const nameRes = validateName(fullName, 'الاسم بالكامل', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    let normalizedPhone: string | undefined = undefined
+    if (phone.trim()) {
+      const phoneRes = validateEgyptianPhone(phone, false, 'رقم الهاتف')
+      if (!phoneRes.isValid && phoneRes.error) errs.phone = phoneRes.error
+      else normalizedPhone = phoneRes.normalized
+    }
+
+    setProfileErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      triggerToast(Object.values(errs)[0], 'error')
+      return
+    }
+
     try {
       setIsSavingProfile(true)
-      await usersApi.update(user.id, {
-        name: fullName,
-        phone: phone || undefined,
+      const res = await authApi.updateProfile({
+        name: fullName.trim(),
+        phone: normalizedPhone || phone.trim() || undefined,
+        avatarUrl: avatarImage || undefined,
       })
-      const saved = localStorage.getItem('gymvip_mock_user')
-      if (saved) {
-        try {
-          const u = JSON.parse(saved)
-          localStorage.setItem('gymvip_mock_user', JSON.stringify({ ...u, name: fullName, phone }))
-        } catch {
-          // ignore
-        }
-      }
+      updateUserData({
+        name: res.user.name,
+        phone: res.user.phone || undefined,
+        avatarUrl: res.user.avatarUrl || undefined,
+      })
       setHasUnsavedChanges(false)
+      setProfileErrors({})
       triggerToast('تم حفظ التغييرات وتحديث بياناتك بنجاح!')
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'حدث خطأ أثناء حفظ البيانات'
-      triggerToast(msg, 'error')
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setProfileErrors(backendErrors)
+      }
+      triggerToast(generalMessage || 'حدث خطأ أثناء حفظ البيانات', 'error')
     } finally {
       setIsSavingProfile(false)
     }
@@ -102,13 +275,17 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault()
     if (!user) return
 
-    if (!isMinLength) {
-      triggerToast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'error')
-      return
+    const errs: Record<string, string> = {}
+    const passRes = validatePassword(newPassword, true)
+    if (!passRes.isValid && passRes.error) errs.newPassword = passRes.error
+
+    if (newPassword !== confirmPassword) {
+      errs.confirmPassword = 'كلمتا المرور غير متطابقتين'
     }
 
-    if (!isMatching) {
-      triggerToast('كلمتا المرور غير متطابقتين', 'error')
+    setPasswordErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      triggerToast(Object.values(errs)[0], 'error')
       return
     }
 
@@ -117,10 +294,11 @@ export const ProfilePage: React.FC = () => {
       await usersApi.resetPassword(user.id, newPassword)
       setNewPassword('')
       setConfirmPassword('')
+      setPasswordErrors({})
       triggerToast('تم تحديث كلمة المرور بنجاح! يرجى استخدام كلمة المرور الجديدة في المرة القادمة.')
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'فشل تحديث كلمة المرور'
-      triggerToast(msg, 'error')
+      const { generalMessage } = extractBackendErrors(err)
+      triggerToast(generalMessage || 'فشل تحديث كلمة المرور', 'error')
     } finally {
       setIsSavingPassword(false)
     }
@@ -251,20 +429,29 @@ export const ProfilePage: React.FC = () => {
           <div className="flex items-start sm:items-center gap-5">
             {/* Avatar Box */}
             <div className="relative shrink-0">
-              <div className="w-20 h-20 bg-zinc-950 rounded-2xl flex items-center justify-center text-white text-2xl font-bold font-cairo shadow-md border border-zinc-800 select-none overflow-hidden">
+              <div
+                onClick={handleOpenPhotoModal}
+                title="تغيير الصورة الشخصية"
+                className="w-20 h-20 bg-zinc-950 rounded-2xl flex items-center justify-center text-white text-2xl font-bold font-cairo shadow-md border border-zinc-800 select-none overflow-hidden cursor-pointer group hover:ring-2 hover:ring-[#D4AF37]/50 transition-all"
+              >
                 {avatarImage ? (
                   <img
-                    src={avatarImage}
+                    src={getMediaUrl(avatarImage)}
                     alt={fullName}
-                    className="w-full h-full object-cover rounded-2xl"
+                    className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform"
                   />
                 ) : (
                   <span>{avatarInitials}</span>
                 )}
               </div>
-              <div className="absolute -bottom-1.5 -left-1.5 w-6 h-6 bg-zinc-900 border border-[#D4AF37]/60 rounded-full flex items-center justify-center text-[#E5C158] shadow-sm">
-                <Star className="w-3.5 h-3.5 fill-[#E5C158]" />
-              </div>
+              <button
+                type="button"
+                onClick={handleOpenPhotoModal}
+                title="تغيير الصورة"
+                className="absolute -bottom-1.5 -left-1.5 w-6 h-6 bg-zinc-900 border border-[#D4AF37]/60 rounded-full flex items-center justify-center text-[#E5C158] hover:bg-[#8A6D1C] hover:text-white transition-colors shadow-sm cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* Profile Info */}
@@ -293,7 +480,7 @@ export const ProfilePage: React.FC = () => {
                   كود المستخدم: USR-{user?.id ? user.id.slice(0, 6) : '001'}
                 </span>
                 <span className="text-zinc-400">•</span>
-                <span>النادي: GymVIP Cairo</span>
+                <span>النادي: {gym?.name || 'GymVIP'}</span>
               </div>
             </div>
           </div>
@@ -302,7 +489,7 @@ export const ProfilePage: React.FC = () => {
           <div className="self-end md:self-center shrink-0">
             <button
               type="button"
-              onClick={() => setPhotoModalOpen(true)}
+              onClick={handleOpenPhotoModal}
               className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold border border-zinc-200/80 transition-all flex items-center gap-2 shadow-2xs"
             >
               <Camera className="w-4 h-4 text-zinc-600" />
@@ -345,15 +532,16 @@ export const ProfilePage: React.FC = () => {
                     <input
                       type="text"
                       value={fullName}
-                      onChange={(e) => {
-                        setFullName(e.target.value)
-                        setHasUnsavedChanges(true)
-                      }}
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-zinc-200 bg-white text-sm font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all"
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      className={cn(
+                        'w-full pl-10 pr-3.5 py-2.5 rounded-xl border bg-white text-sm font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all',
+                        profileErrors.name ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                      )}
                       placeholder="أدخل الاسم الكامل"
                     />
                     <User className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   </div>
+                  <FieldError error={profileErrors.name} />
                 </div>
 
                 {/* Email (Readonly) */}
@@ -383,11 +571,11 @@ export const ProfilePage: React.FC = () => {
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => {
-                        setPhone(e.target.value)
-                        setHasUnsavedChanges(true)
-                      }}
-                      className="w-full pl-16 pr-10 py-2.5 rounded-xl border border-zinc-200 bg-white text-sm font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-left"
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className={cn(
+                        'w-full pl-16 pr-10 py-2.5 rounded-xl border bg-white text-sm font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37] transition-all text-left',
+                        profileErrors.phone ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                      )}
                       dir="ltr"
                     />
                     <Phone className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
@@ -395,6 +583,7 @@ export const ProfilePage: React.FC = () => {
                       +20
                     </span>
                   </div>
+                  <FieldError error={profileErrors.phone} />
                 </div>
 
                 {/* Role & Permissions (Locked) */}
@@ -476,8 +665,11 @@ export const ProfilePage: React.FC = () => {
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 font-mono"
+                      onChange={(e) => handleNewPasswordChange(e.target.value)}
+                      className={cn(
+                        'w-full pl-9 pr-3.5 py-2.5 rounded-xl border bg-white text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 font-mono',
+                        passwordErrors.newPassword ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                      )}
                       placeholder="••••••••"
                     />
                     <button
@@ -492,6 +684,7 @@ export const ProfilePage: React.FC = () => {
                       )}
                     </button>
                   </div>
+                  <FieldError error={passwordErrors.newPassword} />
                 </div>
 
                 {/* Confirm Password */}
@@ -504,8 +697,11 @@ export const ProfilePage: React.FC = () => {
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 font-mono"
+                      onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                      className={cn(
+                        'w-full pl-9 pr-3.5 py-2.5 rounded-xl border bg-white text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 font-mono',
+                        passwordErrors.confirmPassword ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                      )}
                       placeholder="••••••••"
                     />
                     <button
@@ -520,6 +716,7 @@ export const ProfilePage: React.FC = () => {
                       )}
                     </button>
                   </div>
+                  <FieldError error={passwordErrors.confirmPassword} />
                 </div>
               </div>
 
@@ -660,12 +857,24 @@ export const ProfilePage: React.FC = () => {
 
             <div className="flex flex-col items-center justify-center gap-4 py-2">
               <div className="w-24 h-24 bg-zinc-950 rounded-2xl flex items-center justify-center text-white text-3xl font-bold font-cairo shadow-lg border-2 border-gym-gold relative overflow-hidden">
-                {avatarImage ? (
-                  <img src={avatarImage} alt="Avatar" className="w-full h-full object-cover" />
+                {pendingAvatar ? (
+                  <img src={getMediaUrl(pendingAvatar)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span>{avatarInitials}</span>
                 )}
               </div>
+
+              {pendingAvatar && (
+                <button
+                  type="button"
+                  onClick={() => setPendingAvatar(null)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>إزالة الصورة</span>
+                </button>
+              )}
+
               <p className="text-xs text-zinc-500 text-center">
                 الصورة تظهر في شريط التنقل والتقارير وسجل الحركات الإدارية.
               </p>
@@ -673,41 +882,38 @@ export const ProfilePage: React.FC = () => {
 
             <label className="border-2 border-dashed border-zinc-300 hover:border-gym-gold rounded-xl p-5 text-center cursor-pointer transition-colors bg-zinc-50/50 hover:bg-amber-50/30 block">
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    const reader = new FileReader()
-                    reader.onload = () => setAvatarImage(reader.result as string)
-                    reader.readAsDataURL(file)
-                  }
-                }}
+                onChange={handleFileChange}
               />
               <Upload className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
               <p className="text-xs font-bold text-zinc-800">اسحب وأفلت الصورة هنا أو اضغط للتصفح</p>
-              <p className="text-[11px] text-zinc-400 mt-1">يدعم صيغ JPG و PNG حتى 5 ميجابايت</p>
+              <p className="text-[11px] text-zinc-400 mt-1">يدعم صيغ JPG و PNG حتى 5 ميجابايت (يتم تحسينها وضغطها تلقائياً)</p>
             </label>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-100">
               <button
                 type="button"
                 onClick={() => setPhotoModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 hover:bg-zinc-100"
+                disabled={isUploadingPhoto}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
               >
                 إلغاء
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setPhotoModalOpen(false)
-                  triggerToast('تم تحديث الصورة الشخصية بنجاح!')
-                }}
-                className="px-5 py-2 rounded-xl bg-[#60490E] hover:bg-[#523e0c] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                onClick={handleSavePhoto}
+                disabled={isUploadingPhoto}
+                className="px-5 py-2 rounded-xl bg-[#60490E] hover:bg-[#523e0c] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
               >
-                <Check className="w-4 h-4 text-[#F3D372]" />
-                <span>حفظ</span>
+                {isUploadingPhoto ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#F3D372]" />
+                ) : (
+                  <Check className="w-4 h-4 text-[#F3D372]" />
+                )}
+                <span>{isUploadingPhoto ? 'جاري الحفظ...' : 'حفظ'}</span>
               </button>
             </div>
           </div>

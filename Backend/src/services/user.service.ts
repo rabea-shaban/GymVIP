@@ -14,6 +14,8 @@ import type {
 } from '../validators/user.validator.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
+import { saveBase64Image, deleteStoredImage } from '../utils/fileStorage.util.js'
 
 export const formatUserDto = (user: {
   id: string
@@ -21,6 +23,7 @@ export const formatUserDto = (user: {
   name: string
   email: string
   phone: string | null
+  avatarUrl?: string | null
   role: Role
   isActive: boolean
   lastLoginAt: Date | null
@@ -32,6 +35,7 @@ export const formatUserDto = (user: {
   name: user.name,
   email: user.email,
   phone: user.phone,
+  avatarUrl: user.avatarUrl ?? null,
   role: user.role,
   isActive: user.isActive,
   lastLoginAt: user.lastLoginAt,
@@ -80,6 +84,11 @@ export const createUser = async (
   // 3. Hash password
   const passwordHash = await hashPassword(input.password)
 
+  // Save avatar image to disk if provided
+  const savedAvatarUrl = input.avatarUrl
+    ? await saveBase64Image(input.avatarUrl, 'users', `user-${input.email.split('@')[0]}`)
+    : null
+
   // 4. Create user
   const newUser = await prisma.user.create({
     data: {
@@ -87,6 +96,7 @@ export const createUser = async (
       name: input.name,
       email: input.email,
       phone: input.phone || null,
+      avatarUrl: savedAvatarUrl,
       role: input.role,
       passwordHash,
       isActive: true,
@@ -102,6 +112,8 @@ export const createUser = async (
     description: `تم إنشاء حساب مستخدم جديد (${newUser.name}) برتبة (${newUser.role})`,
     afterData: formatUserDto(newUser),
   })
+
+  emitGymEvent(actor.gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'users', action: 'created', userId: newUser.id })
 
   return formatUserDto(newUser)
 }
@@ -143,6 +155,7 @@ export const listUsers = async (
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         role: true,
         isActive: true,
         lastLoginAt: true,
@@ -229,12 +242,33 @@ export const updateUser = async (
     }
   }
 
+  // Handle avatar update
+  let finalAvatarUrl = targetUser.avatarUrl
+  if (input.avatarUrl !== undefined) {
+    if (input.avatarUrl) {
+      finalAvatarUrl = await saveBase64Image(input.avatarUrl, 'users', `user-${targetUser.id}`)
+      if (
+        targetUser.avatarUrl &&
+        targetUser.avatarUrl !== finalAvatarUrl &&
+        targetUser.avatarUrl.startsWith('/uploads/')
+      ) {
+        await deleteStoredImage(targetUser.avatarUrl)
+      }
+    } else {
+      finalAvatarUrl = null
+      if (targetUser.avatarUrl?.startsWith('/uploads/')) {
+        await deleteStoredImage(targetUser.avatarUrl)
+      }
+    }
+  }
+
   // 3. Update in Database
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.phone !== undefined && { phone: input.phone || null }),
+      ...(input.avatarUrl !== undefined && { avatarUrl: finalAvatarUrl }),
       ...(input.role !== undefined && { role: input.role }),
     },
   })
@@ -249,6 +283,8 @@ export const updateUser = async (
     beforeData: formatUserDto(targetUser),
     afterData: formatUserDto(updatedUser),
   })
+
+  emitGymEvent(actor.gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'users', action: 'updated', userId: updatedUser.id })
 
   return formatUserDto(updatedUser)
 }
@@ -310,6 +346,8 @@ export const updateUserStatus = async (
     beforeData: { isActive: targetUser.isActive },
     afterData: { isActive: updatedUser.isActive },
   })
+
+  emitGymEvent(actor.gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'users', action: 'status_changed', userId: updatedUser.id })
 
   return formatUserDto(updatedUser)
 }
@@ -413,6 +451,11 @@ export const deleteUser = async (actor: AuthUser, userId: string): Promise<void>
     await tx.user.delete({ where: { id: targetUser.id } })
   })
 
+  // Delete stored avatar file if exists
+  if (targetUser.avatarUrl?.startsWith('/uploads/')) {
+    await deleteStoredImage(targetUser.avatarUrl)
+  }
+
   await createAuditLog({
     gymId: actor.gymId,
     actorUserId: actor.id,
@@ -422,4 +465,6 @@ export const deleteUser = async (actor: AuthUser, userId: string): Promise<void>
     description: `تم حذف حساب المستخدم (${targetUser.name})`,
     beforeData: { id: targetUser.id, name: targetUser.name, role: targetUser.role },
   })
+
+  emitGymEvent(actor.gymId, REALTIME_EVENTS.SYSTEM_SYNC, { entity: 'users', action: 'deleted', userId })
 }

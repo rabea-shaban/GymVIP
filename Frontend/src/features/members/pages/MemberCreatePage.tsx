@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   User,
   UserPlus,
@@ -22,6 +23,15 @@ import { membersApi } from '../services/membersApi'
 import { plansApi } from '@/features/plans/services/plansApi'
 import { subscriptionsApi } from '@/features/subscriptions/services/subscriptionsApi'
 import { paymentsApi } from '@/features/payments/services/paymentsApi'
+import {
+  validateName,
+  validateEgyptianPhone,
+  validateEmail,
+  validateDateOfBirth,
+  extractBackendErrors,
+} from '@/lib/validation'
+import { showMemberCreatedAlert } from '@/lib/sweetAlert'
+import { FieldError } from '@/components/ui/FieldError'
 
 interface MembershipPlan {
   id: string
@@ -36,17 +46,17 @@ const DEFAULT_PLANS: MembershipPlan[] = [
   { id: 'monthly', name: 'شهري', price: 500, durationDays: 30 },
   { id: 'quarterly', name: '3 شهور', price: 1300, durationDays: 90, badge: 'الأكثر توفيراً', badgeColor: 'bg-amber-100 text-amber-900' },
   { id: 'semi-annual', name: '6 شهور', price: 2400, durationDays: 180 },
-  { id: 'annual', name: 'سنوي', price: 4000, durationDays: 365, badge: 'VIP النخبة', badgeColor: 'bg-zinc-900 text-gym-gold border border-gym-gold/30' },
+  { id: 'annual', name: 'سنوي', price: 4000, durationDays: 365, badge: 'VIP النخبة', badgeColor: 'bg-zinc-900 text-white border border-zinc-700' },
 ]
 
 export const MemberCreatePage: React.FC = () => {
   const navigate = useNavigate()
   const toast = useToast()
+  const queryClient = useQueryClient()
 
   // Plans State
   const [plans, setPlans] = useState<MembershipPlan[]>(DEFAULT_PLANS)
   const [isSaving, setIsSaving] = useState(false)
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false)
 
   // Form Fields State
   const [fullName, setFullName] = useState('')
@@ -56,6 +66,7 @@ export const MemberCreatePage: React.FC = () => {
   const [birthDate, setBirthDate] = useState('')
   const [address, setAddress] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,7 +157,7 @@ export const MemberCreatePage: React.FC = () => {
                 : undefined,
             badgeColor:
               p.durationDays >= 365
-                ? 'bg-zinc-900 text-gym-gold border border-gym-gold/30'
+                ? 'bg-zinc-900 text-white border border-zinc-700'
                 : 'bg-amber-100 text-amber-900',
           }))
           setPlans(mapped)
@@ -190,10 +201,110 @@ export const MemberCreatePage: React.FC = () => {
     setPaidAmount(Math.max(0, plan.price - (Number(discount) || 0)))
   }
 
+  const handleNameChange = (val: string) => {
+    setFullName(val)
+    if (!val.trim()) {
+      setFieldErrors((prev) => ({ ...prev, name: 'اسم العضو مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم العضو', 2, 100)
+      setFieldErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    if (!val.trim()) {
+      setFieldErrors((prev) => ({ ...prev, phone: 'رقم الهاتف المصري مطلوب' }))
+    } else {
+      const res = validateEgyptianPhone(val, true, 'رقم الهاتف')
+      setFieldErrors((prev) => ({ ...prev, phone: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val)
+    if (val.trim()) {
+      const res = validateEmail(val, false)
+      setFieldErrors((prev) => ({ ...prev, email: res.isValid ? '' : (res.error || '') }))
+    } else {
+      setFieldErrors((prev) => ({ ...prev, email: '' }))
+    }
+  }
+
+  const handleBirthDateChange = (val: string) => {
+    setBirthDate(val)
+    if (val) {
+      const res = validateDateOfBirth(val, false)
+      setFieldErrors((prev) => ({ ...prev, birthDate: res.isValid ? '' : (res.error || '') }))
+    } else {
+      setFieldErrors((prev) => ({ ...prev, birthDate: '' }))
+    }
+  }
+
+  const handleDiscountChange = (val: number) => {
+    setDiscount(val)
+    let err = ''
+    if (val < 0) {
+      err = 'قيمة الخصم لا يمكن أن تكون سالبة'
+    } else if (currentPlan && val > currentPlan.price) {
+      err = 'قيمة الخصم لا يمكن أن تتجاوز سعر الباقة'
+    }
+    setFieldErrors((prev) => ({ ...prev, discount: err }))
+    if (currentPlan) {
+      setPaidAmount(Math.max(0, currentPlan.price - val))
+    }
+  }
+
+  const handlePaidAmountChange = (val: number) => {
+    setPaidAmount(val)
+    let err = ''
+    if (val < 0) {
+      err = 'المبلغ المحصل لا يمكن أن يكون سالباً'
+    } else if (currentPlan && val > finalPrice) {
+      err = 'المبلغ المحصل لا يمكن أن يتجاوز المبلغ المطلوب'
+    }
+    setFieldErrors((prev) => ({ ...prev, paidAmount: err }))
+  }
+
+  const validateForm = () => {
+    const errs: Record<string, string> = {}
+    const nameRes = validateName(fullName, 'اسم العضو', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    const phoneRes = validateEgyptianPhone(phone, true, 'رقم الهاتف')
+    if (!phoneRes.isValid && phoneRes.error) errs.phone = phoneRes.error
+
+    const emailRes = validateEmail(email, false)
+    if (!emailRes.isValid && emailRes.error) errs.email = emailRes.error
+
+    const birthRes = validateDateOfBirth(birthDate, false)
+    if (!birthRes.isValid && birthRes.error) errs.birthDate = birthRes.error
+
+    if (discount < 0) {
+      errs.discount = 'قيمة الخصم لا يمكن أن تكون سالبة'
+    } else if (currentPlan && discount > currentPlan.price) {
+      errs.discount = 'قيمة الخصم لا يمكن أن تتجاوز سعر الباقة'
+    }
+
+    if (paidAmount < 0) {
+      errs.paidAmount = 'المبلغ المحصل لا يمكن أن يكون سالباً'
+    } else if (currentPlan && paidAmount > finalPrice) {
+      errs.paidAmount = 'المبلغ المحصل لا يمكن أن يتجاوز المبلغ المطلوب'
+    }
+
+    setFieldErrors(errs)
+    return {
+      isValid: Object.keys(errs).length === 0,
+      errors: errs,
+      normalizedPhone: phoneRes.normalized,
+    }
+  }
+
   const handleSaveMember = async (addAnother: boolean = false) => {
-    setHasAttemptedSubmit(true)
-    if (!fullName.trim() || !phone.trim()) {
-      toast.error('يرجى ملء جميع الحقول الإلزامية المطلوبة (الاسم ورقم الهاتف)')
+    const { isValid, errors: validationErrors, normalizedPhone } = validateForm()
+    if (!isValid) {
+      const firstErrMsg = Object.values(validationErrors)[0]
+      toast.error(firstErrMsg || 'يرجى تصحيح أخطاء الإدخال الموضحة في النموذج')
       return
     }
 
@@ -202,7 +313,7 @@ export const MemberCreatePage: React.FC = () => {
       // 1. Create Member
       const newMember = await membersApi.create({
         name: fullName.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone || phone.trim(),
         email: email.trim() || null,
         gender: gender || null,
         dateOfBirth: birthDate || null,
@@ -240,9 +351,25 @@ export const MemberCreatePage: React.FC = () => {
         }
       }
 
-      toast.success('تم تسجيل العضو وتفعيل الاشتراك والتحصيل المالي بنجاح!')
+      // Invalidate relevant queries so dashboard, members, subscriptions, and payments reflect real data immediately
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
 
-      if (addAnother) {
+      // Show SweetAlert!
+      const userChoice = await showMemberCreatedAlert({
+        name: newMember.name,
+        memberCode: newMember.memberCode,
+        phone: newMember.phone,
+        planName: currentPlan?.name,
+        paidAmount: paidAmount > 0 ? paidAmount : undefined,
+        avatarUrl: newMember.avatarUrl || avatarUrl,
+      })
+
+      if (userChoice === 'view' && !addAnother) {
+        navigate(`/app/members/${newMember.id}`)
+      } else {
         setFullName('')
         setPhone('')
         setEmail('')
@@ -250,20 +377,21 @@ export const MemberCreatePage: React.FC = () => {
         setNotes('')
         setBirthDate('')
         setAvatarUrl(null)
+        setFieldErrors({})
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        setHasAttemptedSubmit(false)
         if (currentPlan) {
           setPaidAmount(currentPlan.price)
         }
         setDiscount(0)
-      } else {
-        setTimeout(() => navigate(`/app/members/${newMember.id}`), 400)
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'حدث خطأ أثناء إضافة العضو'
-      toast.error(msg)
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...backendErrors }))
+      }
+      toast.error(generalMessage || 'حدث خطأ أثناء إضافة العضو')
     } finally {
       setIsSaving(false)
     }
@@ -347,11 +475,11 @@ export const MemberCreatePage: React.FC = () => {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => handleNameChange(e.target.value)}
                     placeholder="مثال: أحمد محمد علي"
                     className={cn(
                       'w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all',
-                      hasAttemptedSubmit && !fullName
+                      fieldErrors.name
                         ? 'border-rose-400 bg-rose-50/50 focus:border-rose-500 text-rose-900'
                         : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                     )}
@@ -360,9 +488,7 @@ export const MemberCreatePage: React.FC = () => {
                     <User className="w-4 h-4" />
                   </div>
                 </div>
-                {hasAttemptedSubmit && !fullName && (
-                  <p className="text-[11px] text-rose-600 font-bold mt-1">حقل الاسم بالكامل مطلوب</p>
-                )}
+                <FieldError error={fieldErrors.name} />
               </div>
 
               {/* Phone and Email Grid */}
@@ -381,19 +507,17 @@ export const MemberCreatePage: React.FC = () => {
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
                       placeholder="01023456789"
                       className={cn(
                         'w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-mono',
-                        hasAttemptedSubmit && !phone
+                        fieldErrors.phone
                           ? 'border-rose-400 bg-rose-50/50 focus:border-rose-500 text-rose-900'
                           : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
                       )}
                     />
                   </div>
-                  {hasAttemptedSubmit && !phone && (
-                    <p className="text-[11px] text-rose-600 font-bold mt-1">رقم الهاتف المصري مطلوب</p>
-                  )}
+                  <FieldError error={fieldErrors.phone} />
                 </div>
 
                 {/* Email */}
@@ -405,10 +529,16 @@ export const MemberCreatePage: React.FC = () => {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => handleEmailChange(e.target.value)}
                     placeholder="ahmed.ali@example.com"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:border-zinc-900 focus:outline-none transition-all font-mono"
+                    className={cn(
+                      'w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-mono',
+                      fieldErrors.email
+                        ? 'border-rose-400 bg-rose-50/50 focus:border-rose-500 text-rose-900'
+                        : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
+                    )}
                   />
+                  <FieldError error={fieldErrors.email} />
                 </div>
               </div>
 
@@ -458,9 +588,15 @@ export const MemberCreatePage: React.FC = () => {
                   <input
                     type="date"
                     value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:border-zinc-900 focus:outline-none transition-all font-mono"
+                    onChange={(e) => handleBirthDateChange(e.target.value)}
+                    className={cn(
+                      'w-full px-3.5 py-2.5 text-xs sm:text-sm bg-zinc-50 border rounded-xl focus:bg-white focus:outline-none transition-all font-mono',
+                      fieldErrors.birthDate
+                        ? 'border-rose-400 bg-rose-50/50 focus:border-rose-500 text-rose-900'
+                        : 'border-zinc-200 focus:border-zinc-900 text-zinc-900'
+                    )}
                   />
+                  <FieldError error={fieldErrors.birthDate} />
                 </div>
               </div>
 
@@ -694,11 +830,7 @@ export const MemberCreatePage: React.FC = () => {
                     min="0"
                     max={totalPrice}
                     value={discount}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0
-                      setDiscount(val)
-                      setPaidAmount(Math.max(0, totalPrice - val))
-                    }}
+                    onChange={(e) => handleDiscountChange(Number(e.target.value) || 0)}
                     placeholder="0"
                     className="w-full pl-10 pr-3 py-2.5 text-xs bg-zinc-50 border border-zinc-200 rounded-xl font-bold"
                   />
@@ -706,6 +838,7 @@ export const MemberCreatePage: React.FC = () => {
                     ج.م
                   </span>
                 </div>
+                <FieldError error={fieldErrors.discount} />
               </div>
 
               <div>
@@ -727,13 +860,17 @@ export const MemberCreatePage: React.FC = () => {
                     min="0"
                     max={finalPrice}
                     value={paidAmount}
-                    onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-                    className="w-full pl-10 pr-3 py-2.5 text-xs bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900"
+                    onChange={(e) => handlePaidAmountChange(Number(e.target.value) || 0)}
+                    className={cn(
+                      'w-full pl-10 pr-3 py-2.5 text-xs bg-zinc-50 border rounded-xl font-bold text-zinc-900',
+                      fieldErrors.paidAmount ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                    )}
                   />
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs text-zinc-400">
                     ج.م
                   </span>
                 </div>
+                <FieldError error={fieldErrors.paidAmount} />
               </div>
             </div>
 
@@ -933,7 +1070,7 @@ export const MemberCreatePage: React.FC = () => {
 
             {/* Member Identity Strip */}
             <div className="bg-zinc-900/90 rounded-2xl p-3.5 border border-zinc-800 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-zinc-800 text-gym-gold border border-gym-gold/40 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
+              <div className="w-11 h-11 rounded-full bg-zinc-800 text-white border border-zinc-700 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="صورة العضو" className="w-full h-full object-cover" />
                 ) : (
@@ -991,8 +1128,8 @@ export const MemberCreatePage: React.FC = () => {
               )}
 
               <div className="flex items-center justify-between text-sm font-black pt-1 text-white border-t border-zinc-800">
-                <span className="text-gym-gold">المطلوب سداده:</span>
-                <span className="text-base text-gym-gold">
+                <span className="text-white">المطلوب سداده:</span>
+                <span className="text-base text-white">
                   {finalPrice.toLocaleString('ar-EG')} ج.م
                 </span>
               </div>
@@ -1013,7 +1150,7 @@ export const MemberCreatePage: React.FC = () => {
                   )}
                 >
                   {remainingAmount.toLocaleString('ar-EG')} ج.م{' '}
-                  {remainingAmount === 0 ? '(خالص بالكامل ✔)' : ''}
+                  {remainingAmount === 0 ? '(خالص بالكامل)' : ''}
                 </span>
               </div>
             </div>

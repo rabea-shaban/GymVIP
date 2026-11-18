@@ -173,7 +173,7 @@ export const RegisterPage: React.FC = () => {
                 { id: 'mismatch', label: 'عدم تطابق المرور' },
                 { id: 'duplicate', label: 'مسجل مسبقاً' },
                 { id: 'loading', label: 'جاري الإنشاء' },
-                { id: 'success', label: 'تم بنجاح ✓' },
+                { id: 'success', label: 'تم بنجاح' },
               ].map((tab) => (
                 <button
                   key={tab.id}

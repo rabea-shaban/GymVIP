@@ -1,8 +1,8 @@
 import React from 'react'
-import { NotFoundPage } from './NotFoundPage'
+import { UnauthorizedPage } from './UnauthorizedPage'
 
 export const ForbiddenPage: React.FC = () => {
-  return <NotFoundPage initialType="403" />
+  return <UnauthorizedPage standalone />
 }
 
 export default ForbiddenPage

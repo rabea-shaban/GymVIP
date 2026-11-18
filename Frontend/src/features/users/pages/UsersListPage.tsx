@@ -23,6 +23,17 @@ import {
 import { usersApi } from '@/features/users/services/usersApi'
 import { useAuth } from '@/features/auth/context/AuthContext'
 import { useToast } from '@/components/feedback/Toast'
+import { useRealtimeSync } from '@/services/socket'
+import {
+  validateName,
+  validateEmail,
+  validateEgyptianPhone,
+  validatePassword,
+  extractBackendErrors,
+} from '@/lib/validation'
+import { FieldError } from '@/components/ui/FieldError'
+import { cn } from '@/lib/utils'
+import { getMediaUrl } from '@/lib/media'
 
 export type SystemUserRole = 'OWNER' | 'MANAGER' | 'RECEPTIONIST' | 'TRAINER'
 
@@ -33,6 +44,7 @@ export interface SystemUser {
   initials: string
   avatarBg: string
   avatarText: string
+  avatarUrl?: string | null
   email: string
   phone?: string | null
   isVerified?: boolean
@@ -86,6 +98,11 @@ export const UsersListPage: React.FC = () => {
   // Password Reset State
   const [newPassword, setNewPassword] = useState('')
 
+  // Validation Errors States
+  const [addUserErrors, setAddUserErrors] = useState<Record<string, string>>({})
+  const [editUserErrors, setEditUserErrors] = useState<Record<string, string>>({})
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null)
+
   // Fetch real users from API
   const fetchUsers = useCallback(async () => {
     try {
@@ -103,6 +120,7 @@ export const UsersListPage: React.FC = () => {
           initials: u.name.slice(0, 2),
           avatarBg: u.role === 'OWNER' || u.role === 'MANAGER' ? 'bg-zinc-950' : 'bg-cyan-100',
           avatarText: u.role === 'OWNER' || u.role === 'MANAGER' ? 'text-white' : 'text-cyan-800',
+          avatarUrl: u.avatarUrl || null,
           email: u.email,
           phone: u.phone,
           role: u.role,
@@ -131,6 +149,11 @@ export const UsersListPage: React.FC = () => {
     fetchUsers()
   }, [fetchUsers])
 
+  // Instant Real-Time WebSocket updates for Users List
+  useRealtimeSync(undefined, () => {
+    fetchUsers()
+  })
+
   // Open Edit Modal with prepopulated values
   const handleOpenEdit = (user: SystemUser) => {
     setSelectedUser(user)
@@ -157,11 +180,101 @@ export const UsersListPage: React.FC = () => {
     setActiveMenuId(null)
   }
 
+  // Real-time Validation Handlers
+  const handleAddNameChange = (val: string) => {
+    setAddName(val)
+    if (!val.trim()) {
+      setAddUserErrors((prev) => ({ ...prev, name: 'اسم المستخدم مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم المستخدم', 2, 100)
+      setAddUserErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleAddEmailChange = (val: string) => {
+    setAddEmail(val)
+    if (!val.trim()) {
+      setAddUserErrors((prev) => ({ ...prev, email: 'البريد الإلكتروني مطلوب' }))
+    } else {
+      const res = validateEmail(val, true)
+      setAddUserErrors((prev) => ({ ...prev, email: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleAddPhoneChange = (val: string) => {
+    setAddPhone(val)
+    if (!val.trim()) {
+      setAddUserErrors((prev) => ({ ...prev, phone: '' }))
+    } else {
+      const res = validateEgyptianPhone(val, false, 'رقم الهاتف')
+      setAddUserErrors((prev) => ({ ...prev, phone: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleAddPasswordChange = (val: string) => {
+    setAddPassword(val)
+    if (!val) {
+      setAddUserErrors((prev) => ({ ...prev, password: 'كلمة المرور مطلوبة' }))
+    } else {
+      const res = validatePassword(val, true)
+      setAddUserErrors((prev) => ({ ...prev, password: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditNameChange = (val: string) => {
+    setEditName(val)
+    if (!val.trim()) {
+      setEditUserErrors((prev) => ({ ...prev, name: 'اسم المستخدم مطلوب' }))
+    } else {
+      const res = validateName(val, 'اسم المستخدم', 2, 100)
+      setEditUserErrors((prev) => ({ ...prev, name: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleEditPhoneChange = (val: string) => {
+    setEditPhone(val)
+    if (!val.trim()) {
+      setEditUserErrors((prev) => ({ ...prev, phone: '' }))
+    } else {
+      const res = validateEgyptianPhone(val, false, 'رقم الهاتف')
+      setEditUserErrors((prev) => ({ ...prev, phone: res.isValid ? '' : (res.error || '') }))
+    }
+  }
+
+  const handleResetPasswordChange = (val: string) => {
+    setNewPassword(val)
+    if (!val) {
+      setResetPasswordError('كلمة المرور الجديدة مطلوبة')
+    } else {
+      const res = validatePassword(val, true)
+      setResetPasswordError(res.isValid ? null : (res.error || null))
+    }
+  }
+
   // Submit Add User
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!addName.trim() || !addEmail.trim() || !addPassword.trim()) {
-      toast.error('يرجى ملء جميع الحقول الإلزامية')
+    const errs: Record<string, string> = {}
+
+    const nameRes = validateName(addName, 'اسم المستخدم', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    const emailRes = validateEmail(addEmail, true)
+    if (!emailRes.isValid && emailRes.error) errs.email = emailRes.error
+
+    let normalizedPhone: string | undefined = undefined
+    if (addPhone.trim()) {
+      const phoneRes = validateEgyptianPhone(addPhone, false, 'رقم الهاتف')
+      if (!phoneRes.isValid && phoneRes.error) errs.phone = phoneRes.error
+      else normalizedPhone = phoneRes.normalized
+    }
+
+    const passRes = validatePassword(addPassword, true)
+    if (!passRes.isValid && passRes.error) errs.password = passRes.error
+
+    setAddUserErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs)[0])
       return
     }
 
@@ -170,7 +283,7 @@ export const UsersListPage: React.FC = () => {
       await usersApi.create({
         name: addName.trim(),
         email: addEmail.trim(),
-        phone: addPhone.trim() || undefined,
+        phone: normalizedPhone || addPhone.trim() || undefined,
         role: addRole,
         password: addPassword.trim(),
       })
@@ -181,9 +294,14 @@ export const UsersListPage: React.FC = () => {
       setAddPhone('')
       setAddRole('RECEPTIONIST')
       setAddPassword('GymVIP@2026')
+      setAddUserErrors({})
       fetchUsers()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'فشل إنشاء المستخدم')
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setAddUserErrors(backendErrors)
+      }
+      toast.error(generalMessage || 'فشل إنشاء المستخدم')
     } finally {
       setIsSubmitting(false)
     }
@@ -193,8 +311,21 @@ export const UsersListPage: React.FC = () => {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedUser) return
-    if (!editName.trim()) {
-      toast.error('الاسم مطلوب')
+    const errs: Record<string, string> = {}
+
+    const nameRes = validateName(editName, 'اسم المستخدم', 2, 100)
+    if (!nameRes.isValid && nameRes.error) errs.name = nameRes.error
+
+    let normalizedPhone: string | undefined = undefined
+    if (editPhone.trim()) {
+      const phoneRes = validateEgyptianPhone(editPhone, false, 'رقم الهاتف')
+      if (!phoneRes.isValid && phoneRes.error) errs.phone = phoneRes.error
+      else normalizedPhone = phoneRes.normalized
+    }
+
+    setEditUserErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs)[0])
       return
     }
 
@@ -202,14 +333,19 @@ export const UsersListPage: React.FC = () => {
       setIsSubmitting(true)
       await usersApi.update(selectedUser.id, {
         name: editName.trim(),
-        phone: editPhone.trim() || undefined,
+        phone: normalizedPhone || editPhone.trim() || undefined,
         role: editRole,
       })
       toast.success('تم تحديث بيانات المستخدم بنجاح')
       setEditModalOpen(false)
+      setEditUserErrors({})
       fetchUsers()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'فشل تحديث بيانات المستخدم')
+      const { fieldErrors: backendErrors, generalMessage } = extractBackendErrors(err)
+      if (Object.keys(backendErrors).length > 0) {
+        setEditUserErrors(backendErrors)
+      }
+      toast.error(generalMessage || 'فشل تحديث بيانات المستخدم')
     } finally {
       setIsSubmitting(false)
     }
@@ -239,8 +375,12 @@ export const UsersListPage: React.FC = () => {
   const handleSavePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedUser) return
-    if (!newPassword.trim()) {
-      toast.error('يرجى إدخال كلمة المرور الجديدة')
+    setResetPasswordError(null)
+
+    const passRes = validatePassword(newPassword, true)
+    if (!passRes.isValid && passRes.error) {
+      setResetPasswordError(passRes.error)
+      toast.error(passRes.error)
       return
     }
 
@@ -249,8 +389,11 @@ export const UsersListPage: React.FC = () => {
       await usersApi.resetPassword(selectedUser.id, newPassword.trim())
       toast.success('تم إعادة تعيين كلمة المرور بنجاح')
       setResetModalOpen(false)
+      setResetPasswordError(null)
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'فشل إعادة تعيين كلمة المرور')
+      const { generalMessage } = extractBackendErrors(err)
+      setResetPasswordError(generalMessage)
+      toast.error(generalMessage || 'فشل إعادة تعيين كلمة المرور')
     } finally {
       setIsSubmitting(false)
     }
@@ -474,9 +617,13 @@ export const UsersListPage: React.FC = () => {
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${u.avatarBg} ${u.avatarText}`}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${u.avatarBg} ${u.avatarText} overflow-hidden shrink-0`}
                         >
-                          {u.initials}
+                          {u.avatarUrl ? (
+                            <img src={getMediaUrl(u.avatarUrl)} alt={u.name} className="w-full h-full object-cover" />
+                          ) : (
+                            u.initials
+                          )}
                         </div>
                         <div>
                           <div className="font-bold text-zinc-950 text-xs sm:text-sm">{u.name}</div>
@@ -652,9 +799,13 @@ export const UsersListPage: React.FC = () => {
 
             <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-200 flex items-center gap-4">
               <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg ${selectedUser.avatarBg} ${selectedUser.avatarText}`}
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg ${selectedUser.avatarBg} ${selectedUser.avatarText} overflow-hidden shrink-0`}
               >
-                {selectedUser.initials}
+                {selectedUser.avatarUrl ? (
+                  <img src={getMediaUrl(selectedUser.avatarUrl)} alt={selectedUser.name} className="w-full h-full object-cover" />
+                ) : (
+                  selectedUser.initials
+                )}
               </div>
               <div className="space-y-1">
                 <h4 className="text-base font-bold text-zinc-900">{selectedUser.name}</h4>
@@ -760,10 +911,14 @@ export const UsersListPage: React.FC = () => {
                     type="text"
                     required
                     value={addName}
-                    onChange={(e) => setAddName(e.target.value)}
+                    onChange={(e) => handleAddNameChange(e.target.value)}
                     placeholder="مثال: حسام علي"
-                    className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 font-bold focus:bg-white focus:outline-none focus:border-zinc-900"
+                    className={cn(
+                      'w-full p-2.5 rounded-xl border bg-zinc-50 font-bold focus:bg-white focus:outline-none',
+                      addUserErrors.name ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                   />
+                  <FieldError error={addUserErrors.name} />
                 </div>
 
                 <div className="space-y-1">
@@ -772,11 +927,15 @@ export const UsersListPage: React.FC = () => {
                     type="email"
                     required
                     value={addEmail}
-                    onChange={(e) => setAddEmail(e.target.value)}
+                    onChange={(e) => handleAddEmailChange(e.target.value)}
                     placeholder="name@gymvip.com"
-                    className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-left font-mono focus:bg-white focus:outline-none focus:border-zinc-900"
+                    className={cn(
+                      'w-full p-2.5 rounded-xl border bg-zinc-50 text-left font-mono focus:bg-white focus:outline-none',
+                      addUserErrors.email ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                     dir="ltr"
                   />
+                  <FieldError error={addUserErrors.email} />
                 </div>
 
                 <div className="space-y-1">
@@ -784,11 +943,15 @@ export const UsersListPage: React.FC = () => {
                   <input
                     type="text"
                     value={addPhone}
-                    onChange={(e) => setAddPhone(e.target.value)}
+                    onChange={(e) => handleAddPhoneChange(e.target.value)}
                     placeholder="01012345678"
-                    className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-left font-mono focus:bg-white focus:outline-none focus:border-zinc-900"
+                    className={cn(
+                      'w-full p-2.5 rounded-xl border bg-zinc-50 text-left font-mono focus:bg-white focus:outline-none',
+                      addUserErrors.phone ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                     dir="ltr"
                   />
+                  <FieldError error={addUserErrors.phone} />
                 </div>
 
                 <div className="space-y-1">
@@ -810,10 +973,14 @@ export const UsersListPage: React.FC = () => {
                     type="text"
                     required
                     value={addPassword}
-                    onChange={(e) => setAddPassword(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-left font-mono font-bold focus:bg-white focus:outline-none focus:border-zinc-900"
+                    onChange={(e) => handleAddPasswordChange(e.target.value)}
+                    className={cn(
+                      'w-full p-2.5 rounded-xl border bg-zinc-50 text-left font-mono font-bold focus:bg-white focus:outline-none',
+                      addUserErrors.password ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200 focus:border-zinc-900'
+                    )}
                     dir="ltr"
                   />
+                  <FieldError error={addUserErrors.password} />
                 </div>
               </div>
 
@@ -858,16 +1025,20 @@ export const UsersListPage: React.FC = () => {
 
             <form onSubmit={handleSavePasswordReset} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-800 mb-1">كلمة المرور الجديدة</label>
+                <label className="block text-xs font-bold text-zinc-800 mb-1">كلمة المرور الجديدة *</label>
                 <input
                   type="text"
                   required
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="أدخل كلمة المرور الجديدة"
-                  className="w-full p-2.5 rounded-xl border border-zinc-200 text-left font-mono font-bold"
+                  onChange={(e) => handleResetPasswordChange(e.target.value)}
+                  placeholder="أدخل كلمة المرور الجديدة (8 أحرف وأرقام)"
+                  className={cn(
+                    'w-full p-2.5 rounded-xl border text-left font-mono font-bold focus:bg-white focus:outline-none',
+                    resetPasswordError ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                  )}
                   dir="ltr"
                 />
+                <FieldError error={resetPasswordError} />
               </div>
 
               <div className="flex items-center justify-center gap-3 pt-2">
@@ -996,9 +1167,13 @@ export const UsersListPage: React.FC = () => {
                   type="text"
                   required
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 font-bold focus:bg-white"
+                  onChange={(e) => handleEditNameChange(e.target.value)}
+                  className={cn(
+                    'w-full p-2.5 rounded-xl border bg-zinc-50 font-bold focus:bg-white focus:outline-none',
+                    editUserErrors.name ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                  )}
                 />
+                <FieldError error={editUserErrors.name} />
               </div>
 
               <div>
@@ -1006,11 +1181,15 @@ export const UsersListPage: React.FC = () => {
                 <input
                   type="text"
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
+                  onChange={(e) => handleEditPhoneChange(e.target.value)}
                   placeholder="01012345678"
-                  className="w-full p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-left font-mono"
+                  className={cn(
+                    'w-full p-2.5 rounded-xl border bg-zinc-50 text-left font-mono focus:bg-white focus:outline-none',
+                    editUserErrors.phone ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
+                  )}
                   dir="ltr"
                 />
+                <FieldError error={editUserErrors.phone} />
               </div>
 
               <div>
