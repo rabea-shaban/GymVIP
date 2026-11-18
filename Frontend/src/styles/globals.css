@@ -71,6 +71,11 @@
 /* ==========================================================================
    GymVIP Luxury SweetAlert2 Dark & Gold Theme
    ========================================================================== */
+.swal2-container,
+.gym-swal-container {
+  z-index: 100000 !important;
+}
+
 .swal2-container.swal2-backdrop-show {
   background: rgba(0, 0, 0, 0.8) !important;
   backdrop-filter: blur(8px) !important;

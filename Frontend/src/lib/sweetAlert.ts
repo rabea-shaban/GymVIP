@@ -9,6 +9,7 @@ export const gymSwal = Swal.mixin({
   background: '#111114',
   color: '#ffffff',
   customClass: {
+    container: 'gym-swal-container',
     popup: 'gym-swal-popup font-cairo',
     title: 'gym-swal-title',
     htmlContainer: 'gym-swal-html',

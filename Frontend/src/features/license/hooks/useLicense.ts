@@ -17,10 +17,11 @@ export const useLicense = () => {
 
   const activateMutation = useMutation({
     mutationFn: (key: string) => activateLicense(key),
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       queryClient.setQueryData(LICENSE_QUERY_KEY, data)
       queryClient.invalidateQueries()
-      await showLicenseActivatedAlert({
+      // Non-blocking celebration alert on top layer
+      showLicenseActivatedAlert({
         gymName: data.gymName,
         tier: data.tier,
         expiresAt: data.expiresAt,
