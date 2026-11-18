@@ -48,7 +48,7 @@ export const LoginPage: React.FC = () => {
         if (!installStatus.isAccountSetupDone || installStatus.state === 'ACCOUNT_SETUP_REQUIRED' || installStatus.state === 'INITIAL_LOGIN') {
           navigate('/initial-setup')
         } else if (!installStatus.isActivated || installStatus.state === 'ACTIVATION_REQUIRED' || installStatus.state === 'EXPIRED' || installStatus.state === 'SUSPENDED') {
-          navigate('/activation')
+          navigate('/setup')
         } else {
           navigate('/app/dashboard')
         }

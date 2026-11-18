@@ -61,7 +61,7 @@ export const InitialAccountSetupPage: React.FC = () => {
         newPassword,
         confirmNewPassword,
       })
-      navigate('/activation')
+      navigate('/setup')
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'حدث خطأ أثناء حفظ البيانات')
     }

@@ -5,6 +5,7 @@ import { GuestRoute } from '@/features/auth/components/GuestRoute'
 import { InstallationGuard } from '@/features/installation/components/InstallationGuard'
 import InitialAccountSetupPage from '@/features/installation/pages/InitialAccountSetupPage'
 import ActivationPage from '@/features/installation/pages/ActivationPage'
+import InstallationWizardPage from '@/features/installation/pages/InstallationWizardPage'
 
 const InstallationLayout: React.FC = () => {
   return (
@@ -98,14 +99,14 @@ export const routes: RouteObject[] = [
         element: <DesignSystemPage />,
       },
 
-      // Gym Onboarding / Setup Wizard Route
+      // Gym Onboarding / Comprehensive Installation Wizard Route
       {
         path: '/setup',
-        element: <GymSetupWizardPage />,
+        element: <InstallationWizardPage />,
       },
       {
         path: '/onboarding',
-        element: <GymSetupWizardPage />,
+        element: <InstallationWizardPage />,
       },
 
       // Guest Routes (Auth)

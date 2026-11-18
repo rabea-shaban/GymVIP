@@ -97,7 +97,7 @@ export const ActivationPage: React.FC = () => {
     try {
       await activate(sanitized)
       setLicenseKeyInput('')
-      navigate('/app/dashboard')
+      navigate('/setup')
     } catch {
       // Error handled by mutation hook with notifyError
     }

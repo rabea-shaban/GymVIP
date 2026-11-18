@@ -217,3 +217,161 @@ export async function completeInitialAccountSetup(
   logger.info(`[Installation] Initial account setup completed for ${newEmail}`)
   return await getSystemInstallationStatus()
 }
+
+export interface InstallationWizardCompleteInput {
+  name: string
+  branchName?: string
+  phone?: string
+  email?: string
+  address?: string
+  city?: string
+  logo?: string
+  subscriptionReminderEnabled?: boolean
+  subscriptionReminderDays?: number[]
+  subscriptionFreezeEnabled?: boolean
+  allowedFreezeDurations?: number[]
+  maxFreezeDays?: number
+  allowManualCheckout?: boolean
+}
+
+/**
+ * Retrieves all data required for the Installation Wizard
+ */
+export async function getInstallationWizardData(gymId?: string) {
+  const installation = await getSystemInstallationStatus()
+  const license = await getSystemLicenseStatus()
+
+  // Get primary gym
+  let gym = null
+  if (gymId) {
+    gym = await prisma.gym.findUnique({ where: { id: gymId } })
+  }
+  if (!gym) {
+    gym = await prisma.gym.findFirst()
+  }
+
+  const { formatGymProfile } = await import('./gym.service.js')
+  const { getMachineId } = await import('../utils/machineId.util.js')
+  const machineId = getMachineId()
+
+  const { listDatabaseBackups } = await import('./backup.service.js')
+  const backups = await listDatabaseBackups().catch(() => [])
+
+  return {
+    installation,
+    license,
+    machineId,
+    gym: gym ? formatGymProfile(gym) : null,
+    backupsSummary: {
+      count: backups.length,
+      latestBackup: backups[0] || null,
+    },
+  }
+}
+
+/**
+ * Completes the installation setup wizard, saving all 7 configuration sections,
+ * verifying the license, and transitioning the system to ACTIVE.
+ */
+export async function completeInstallationSetup(
+  input: InstallationWizardCompleteInput,
+  actorUserId?: string,
+  gymId?: string
+) {
+  // 1. Verify license is activated
+  const license = await getSystemLicenseStatus()
+  if (!license.isValid || !license.isActivated) {
+    throw AppError.badRequest('لا يمكن إكمال التثبيت: يرجى تفعيل كود ترخيص النظام بنجاح أولاً')
+  }
+
+  // 2. Find gym
+  let gym = null
+  if (gymId) {
+    gym = await prisma.gym.findUnique({ where: { id: gymId } })
+  }
+  if (!gym) {
+    gym = await prisma.gym.findFirst()
+  }
+  if (!gym) {
+    throw AppError.notFound('لم يتم العثور على سجل النادي الرياضي')
+  }
+
+  // 3. Handle logo storage if provided as data URL
+  let savedLogo = gym.logo
+  if (input.logo && input.logo.startsWith('data:image/')) {
+    const { saveBase64Image } = await import('../utils/fileStorage.util.js')
+    savedLogo = await saveBase64Image(input.logo, 'gyms', `gym-${gym.slug}`)
+  } else if (input.logo !== undefined) {
+    savedLogo = input.logo || null
+  }
+
+  // 4. Update Gym Profile and Settings
+  const sortedReminderDays = input.subscriptionReminderDays
+    ? JSON.stringify([...input.subscriptionReminderDays].sort((a, b) => b - a))
+    : gym.subscriptionReminderDays
+
+  const sortedFreezeDurations = input.allowedFreezeDurations
+    ? JSON.stringify([...input.allowedFreezeDurations].sort((a, b) => a - b))
+    : gym.allowedFreezeDurations
+
+  const updatedGym = await prisma.gym.update({
+    where: { id: gym.id },
+    data: {
+      name: input.name.trim() || gym.name,
+      phone: input.phone !== undefined ? input.phone || null : gym.phone,
+      email: input.email !== undefined ? input.email || null : gym.email,
+      address: input.address !== undefined ? input.address || null : gym.address,
+      city: input.city !== undefined ? input.city || null : gym.city,
+      logo: savedLogo,
+      subscriptionReminderEnabled: input.subscriptionReminderEnabled ?? gym.subscriptionReminderEnabled,
+      subscriptionReminderDays: sortedReminderDays,
+      subscriptionFreezeEnabled: input.subscriptionFreezeEnabled ?? gym.subscriptionFreezeEnabled,
+      allowedFreezeDurations: sortedFreezeDurations,
+      maxFreezeDays: input.maxFreezeDays ?? gym.maxFreezeDays,
+      allowManualCheckout: input.allowManualCheckout ?? gym.allowManualCheckout,
+      setupCompleted: true,
+    },
+  })
+
+  // 5. Update System Installation State to ACTIVE
+  await prisma.systemInstallation.upsert({
+    where: { id: 'singleton' },
+    update: {
+      state: 'ACTIVE',
+      isActivated: true,
+      activatedAt: new Date(),
+    },
+    create: {
+      id: 'singleton',
+      state: 'ACTIVE',
+      isAccountSetupDone: true,
+      isActivated: true,
+      activatedAt: new Date(),
+    },
+  })
+
+  // 6. Log audit event
+  await createAuditLog({
+    gymId: gym.id,
+    actorUserId: actorUserId || 'SYSTEM',
+    action: AUDIT_ACTIONS.GYM_SETTINGS_UPDATED,
+    entityType: AUDIT_ENTITY_TYPES.GYM,
+    entityId: gym.id,
+    description: `اكتمال معالج التثبيت والإعداد الأولي للنظام وتفعيل رخصة ${license.tier || 'PRO'} بنجاح`,
+    metadata: {
+      gymName: updatedGym.name,
+      tier: license.tier,
+      maxMembers: license.maxMembers,
+    },
+  })
+
+  const { formatGymProfile } = await import('./gym.service.js')
+  logger.info(`[Installation] Full setup completed successfully for Gym: ${updatedGym.name}`)
+
+  return {
+    success: true,
+    message: 'تم إكمال معالج التثبيت وتفعيل النظام بنجاح!',
+    gym: formatGymProfile(updatedGym),
+    installation: await getSystemInstallationStatus(),
+  }
+}

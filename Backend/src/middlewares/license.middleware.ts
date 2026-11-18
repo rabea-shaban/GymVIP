@@ -3,14 +3,11 @@ import { getSystemLicenseStatus } from '../services/license.service.js'
 
 // Routes that must never be blocked by license check
 const ALLOWED_UNLICENSED_PATHS = [
-  '/api/v1/license/status',
-  '/api/v1/license/machine-id',
-  '/api/v1/license/activate',
-  '/api/v1/installation/status',
-  '/api/v1/installation/setup-account',
-  '/api/v1/auth/login',
-  '/api/v1/auth/logout',
-  '/api/v1/auth/me',
+  '/api/v1/license',
+  '/api/v1/installation',
+  '/api/v1/gym',
+  '/api/v1/backup',
+  '/api/v1/auth',
   '/api/v1/health',
 ]
 

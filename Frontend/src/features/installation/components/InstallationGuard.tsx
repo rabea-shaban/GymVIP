@@ -43,16 +43,16 @@ export const InstallationGuard: React.FC<InstallationGuardProps> = ({ children }
     return <>{children}</>
   }
 
-  // 3. Activation Required / Expired / Suspended Phase
+  // 3. Setup Wizard & Activation Phase
   if (!installation.isActivated || installation.state === 'ACTIVATION_REQUIRED' || installation.state === 'EXPIRED' || installation.state === 'SUSPENDED') {
-    if (currentPath !== '/activation') {
-      return <Navigate to="/activation" replace />
+    if (currentPath !== '/setup' && currentPath !== '/activation') {
+      return <Navigate to="/setup" replace />
     }
     return <>{children}</>
   }
 
-  // 4. System is ACTIVE: do not allow navigating back to initial setup or activation
-  if (installation.state === 'ACTIVE' && (currentPath === '/initial-setup' || currentPath === '/activation')) {
+  // 4. System is ACTIVE: do not allow navigating back to initial setup, activation or wizard
+  if (installation.state === 'ACTIVE' && (currentPath === '/initial-setup' || currentPath === '/activation' || currentPath === '/setup')) {
     return <Navigate to="/app/dashboard" replace />
   }
 
