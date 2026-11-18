@@ -337,6 +337,21 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// SystemInstallation model managing first-time installation and onboarding state machine
+model SystemInstallation {
+  id                 String    @id @default("singleton")
+  state              String    @default("INITIAL_LOGIN") // INITIAL_LOGIN, ACCOUNT_SETUP_REQUIRED, ACTIVATION_REQUIRED, ACTIVE, EXPIRED, SUSPENDED
+  isAccountSetupDone Boolean   @default(false)
+  isActivated        Boolean   @default(false)
+  initialAdminEmail  String    @default("capt.ahmed@gymvip.eg")
+  installedAt        DateTime  @default(now())
+  accountSetupAt     DateTime?
+  activatedAt        DateTime?
+  updatedAt          DateTime  @updatedAt
+
+  @@map("system_installations")
+}
+
 /// SystemLicense model representing local machine license and activation status
 model SystemLicense {
   id              String    @id @default(uuid())
@@ -345,6 +360,8 @@ model SystemLicense {
   gymName         String
   tier            String    @default("PRO")
   maxMembers      Int       @default(500)
+  amountPaid      Float     @default(0)
+  durationDays    Int       @default(365)
   features        String?
   issuedAt        DateTime
   expiresAt       DateTime

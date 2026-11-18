@@ -9,6 +9,8 @@ export interface LicensePayload {
   machineId: string
   tier: 'STARTER' | 'PRO' | 'ENTERPRISE'
   maxMembers: number
+  amountPaid?: number
+  durationDays?: number
   features: string[]
   issuedAt: string // ISO date
   expiresAt: string // ISO date

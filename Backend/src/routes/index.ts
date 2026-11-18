@@ -16,6 +16,7 @@ import { auditRouter } from './audit.routes.js'
 import { exportRouter } from './export.routes.js'
 import licenseRouter from './license.routes.js'
 import backupRouter from './backup.routes.js'
+import installationRouter from './installation.routes.js'
 import { requireLicense } from '../middlewares/license.middleware.js'
 
 export const apiRouter: Router = Router()
@@ -23,6 +24,7 @@ export const apiRouter: Router = Router()
 // 1. Unrestricted Public/Essential Sub-routers
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/license', licenseRouter)
+apiRouter.use('/installation', installationRouter)
 apiRouter.use('/auth', authRouter)
 
 // 2. License Guard Middleware (enforces active license on all operational SaaS endpoints)

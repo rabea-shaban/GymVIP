@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ShieldCheck,
   Lock,
@@ -10,21 +10,14 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  Award,
   Dumbbell,
-  Server,
+  Award,
   Zap,
+  Server,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '../context/AuthContext'
-import type { UserRole } from '@/types'
-
-interface RoleCredential {
-  id: string
-  label: string
-  email: string
-  roleName: string
-}
+import { getInstallationStatus } from '../../installation/services/installationApi'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -38,22 +31,6 @@ export const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [selectedRole, setSelectedRole] = useState('صاحب النادي')
-
-  const roles: RoleCredential[] = [
-    { id: 'owner', label: 'صاحب النادي', email: 'capt.ahmed@gymvip.eg', roleName: 'Owner / Admin' },
-    { id: 'manager', label: 'المدير التنفيذي', email: 'manager@gymvip.eg', roleName: 'Branch Manager' },
-    { id: 'reception', label: 'موظف الاستقبال', email: 'reception@gymvip.eg', roleName: 'Receptionist' },
-    { id: 'trainer', label: 'المدرب الرياضي', email: 'amlb31388@gmail.com', roleName: 'Fitness Coach' },
-  ]
-
-  const handleRoleSelect = (role: RoleCredential) => {
-    setSelectedRole(role.label)
-    setEmail(role.email)
-    setPassword('GymVIP2025#')
-    setErrorMessage(null)
-    setSuccessMessage(null)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,25 +39,19 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true)
 
     try {
-      let role: UserRole = 'OWNER'
-      if (selectedRole.includes('مدير') || selectedRole.includes('المدير')) {
-        role = 'MANAGER'
-      } else if (selectedRole.includes('استقبال')) {
-        role = 'RECEPTIONIST'
-      } else if (selectedRole.includes('مدرب') || selectedRole.includes('المدرب')) {
-        role = 'TRAINER'
-      }
+      await login({ phoneOrEmail: email, password, role: 'OWNER' })
+      setSuccessMessage('تم التحقق بنجاح من بيانات الحساب!')
 
-      await login({ phoneOrEmail: email, password, role })
-      const target =
-        role === 'TRAINER'
-          ? '/app/trainer/dashboard'
-          : role === 'RECEPTIONIST'
-          ? '/app/reception/dashboard'
-          : '/app/dashboard'
-      setSuccessMessage('تم التحقق بنجاح! جاري التوجيه للوحة التحكم...')
+      // Check current installation & license status
+      const installStatus = await getInstallationStatus()
       setTimeout(() => {
-        navigate(target)
+        if (!installStatus.isAccountSetupDone || installStatus.state === 'ACCOUNT_SETUP_REQUIRED' || installStatus.state === 'INITIAL_LOGIN') {
+          navigate('/initial-setup')
+        } else if (!installStatus.isActivated || installStatus.state === 'ACTIVATION_REQUIRED' || installStatus.state === 'EXPIRED' || installStatus.state === 'SUSPENDED') {
+          navigate('/activation')
+        } else {
+          navigate('/app/dashboard')
+        }
       }, 500)
     } catch (err: any) {
       setErrorMessage(err.message || 'فشل تسجيل الدخول. يرجى التحقق من صحة البريد الإلكتروني وكلمة المرور.')
@@ -365,43 +336,10 @@ export const LoginPage: React.FC = () => {
                   )}
                 </button>
                 <p className="text-center text-[11px] text-zinc-400 mt-2">
-                  يتم التحقق من بصمة الجهاز والتشفير السحابي بأمان
+                  نظام تجاري محمي بتوقيع رقمي غير متماثل ومقفل على عتاد الجهاز
                 </p>
               </div>
             </form>
-
-            {/* Fast Demo Role Selection Badges */}
-            <div className="pt-4 border-t border-zinc-100 space-y-2.5 text-center">
-              <div className="flex items-center justify-between text-[11px] text-zinc-500 font-medium">
-                <span>تجربة الدخول السريع برتب الصلاحيات:</span>
-                <span className="text-zinc-400 text-[10px]">اضغط للتعبئة</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {roles.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => handleRoleSelect(r)}
-                    className={cn(
-                      'px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border text-center',
-                      selectedRole === r.label
-                        ? 'bg-[#0B0B0B] text-white border-zinc-900 shadow-xs'
-                        : 'bg-zinc-50 text-zinc-700 border-zinc-200/80 hover:bg-zinc-100 hover:text-zinc-900'
-                    )}
-                  >
-                    <span className="block truncate">{r.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Create Account & Contact Link */}
-            <div className="text-center text-xs text-zinc-500 pt-1">
-              ليس لديك اشتراك لناديك الرياضي؟{' '}
-              <Link to="/register" className="font-bold text-[#D4AF37] hover:underline">
-                طلب تدشين فرع جديد
-              </Link>
-            </div>
           </div>
 
           {/* Page Bottom Footer */}

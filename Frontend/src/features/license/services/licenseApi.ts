@@ -8,9 +8,13 @@ export interface LicenseStatusDto {
   gymName?: string | null
   tier?: string | null
   maxMembers?: number | null
+  amountPaid?: number
+  durationDays?: number
   currentMembersCount?: number
   daysRemaining?: number
+  activatedAt?: string | null
   expiresAt?: string | null
+  renewalDate?: string | null
   inGracePeriod?: boolean
   message: string
 }

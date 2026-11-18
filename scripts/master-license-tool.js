@@ -54,11 +54,13 @@ export function generateLicense({
   tier = 'PRO',
   maxMembers = 500,
   days = 365,
+  amountPaid = 0,
   gracePeriodDays = 3,
   features = ['ALL'],
 }) {
   const issuedAt = new Date();
-  const expiresAt = new Date(issuedAt.getTime() + days * 24 * 60 * 60 * 1000);
+  const durationDays = Number(days);
+  const expiresAt = new Date(issuedAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
   const licenseId = crypto.randomUUID();
 
   const payload = {
@@ -67,6 +69,8 @@ export function generateLicense({
     machineId,
     tier,
     maxMembers: Number(maxMembers),
+    amountPaid: Number(amountPaid),
+    durationDays,
     features: Array.isArray(features) ? features : [features],
     issuedAt: issuedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
@@ -96,6 +100,8 @@ export function generateLicense({
     machineId,
     tier,
     maxMembers,
+    amountPaid: Number(amountPaid),
+    durationDays,
     expiresAt: expiresAt.toISOString(),
     key: fullLicenseKey,
   });
@@ -120,6 +126,7 @@ async function run() {
   let tier = cliOptions.tier || 'PRO';
   let members = cliOptions.members || 500;
   let days = cliOptions.days || 365;
+  let amountPaid = cliOptions.amount || 0;
 
   if (!gymName) {
     gymName = await prompt('📌 اسم الجيم (Gym Name): ');
@@ -135,6 +142,10 @@ async function run() {
     const daysAns = await prompt('⏳ مدة الترخيص بالأيام (افتراضي: 365 يوم - سنة): ');
     if (daysAns) days = Number(daysAns);
   }
+  if (!cliOptions.amount) {
+    const amtAns = await prompt('💰 المبلغ المدفوع بالجنيه المصري (افتراضي: 0): ');
+    if (amtAns) amountPaid = Number(amtAns);
+  }
 
   if (!gymName || !machineId) {
     console.error('❌ خطأ: اسم الجيم وكود الجهاز مطلوبان لإصدار الترخيص!');
@@ -147,6 +158,7 @@ async function run() {
     tier,
     maxMembers: members,
     days,
+    amountPaid,
   });
 
   console.log('\n✅ تم توليد كود التفعيل المشفر بنجاح!\n');
@@ -156,6 +168,7 @@ async function run() {
   console.log('-------------------------------------------------------------');
   console.log(`📅 تاريخ الانتهاء: ${result.expiresAtFormatted} (${days} يوم)`);
   console.log(`👥 الحد الأقصى للأعضاء: ${members} عضو`);
+  console.log(`💰 المبلغ المدفوع: ${amountPaid} ج.م`);
   console.log(`🏢 الجيم: ${gymName}`);
   console.log(`💻 كود الجهاز: ${machineId}`);
   console.log('-------------------------------------------------------------\n');
@@ -166,7 +179,8 @@ async function run() {
 يسعدنا إرسال كود تفعيل نسختكم الخاصة من برنامج إدارة الأندية الرياضية GymVIP:
 
 🔹 باقة الاشتراك: ${tier} (${members} عضو)
-🔹 الصلاحية حتى: ${result.expiresAtFormatted}
+🔹 الصلاحية: ${days} يوم حتى ${result.expiresAtFormatted}
+🔹 المبلغ المدفوع: ${amountPaid} ج.م
 🔹 كود التفعيل:
 \`\`\`
 ${result.key}

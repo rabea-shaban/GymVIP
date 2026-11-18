@@ -6,6 +6,8 @@ const ALLOWED_UNLICENSED_PATHS = [
   '/api/v1/license/status',
   '/api/v1/license/machine-id',
   '/api/v1/license/activate',
+  '/api/v1/installation/status',
+  '/api/v1/installation/setup-account',
   '/api/v1/auth/login',
   '/api/v1/auth/logout',
   '/api/v1/auth/me',
@@ -23,12 +25,26 @@ export const requireLicense = async (
 ): Promise<void> => {
   const path = req.path.toLowerCase()
 
-  // Always allow license endpoints and auth essentials
+  // Always allow license endpoints, installation endpoints, and auth essentials
   if (ALLOWED_UNLICENSED_PATHS.some((allowed) => path.startsWith(allowed))) {
     return next()
   }
 
   try {
+    const { getSystemInstallationStatus } = await import('../services/installation.service.js')
+    const installation = await getSystemInstallationStatus()
+
+    if (installation.state !== 'ACTIVE') {
+      res.status(403).json({
+        success: false,
+        code: 'INSTALLATION_GUARD',
+        state: installation.state,
+        message: installation.message,
+        timestamp: new Date().toISOString(),
+      })
+      return
+    }
+
     const license = await getSystemLicenseStatus()
 
     if (!license.isValid) {

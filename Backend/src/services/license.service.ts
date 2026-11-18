@@ -19,9 +19,13 @@ export interface LicenseStatusResponse {
   gymName?: string | null
   tier?: string | null
   maxMembers?: number | null
+  amountPaid?: number
+  durationDays?: number
   currentMembersCount?: number
   daysRemaining?: number
+  activatedAt?: string | null
   expiresAt?: string | null
+  renewalDate?: string | null
   inGracePeriod?: boolean
   message: string
 }
@@ -102,6 +106,16 @@ export async function getSystemLicenseStatus(forceFresh: boolean = false): Promi
     logger.warn('Failed to update systemLicense lastVerifiedAt:', err)
   }
 
+  const p = verification.payload
+  const calculatedDuration =
+    p?.durationDays ||
+    licenseRecord.durationDays ||
+    Math.round(
+      (new Date(p?.expiresAt ?? licenseRecord.expiresAt).getTime() -
+        new Date(p?.issuedAt ?? licenseRecord.issuedAt).getTime()) /
+        (24 * 60 * 60 * 1000)
+    )
+
   const result: LicenseStatusResponse = {
     isActivated: true,
     isValid: verification.valid,
@@ -110,9 +124,13 @@ export async function getSystemLicenseStatus(forceFresh: boolean = false): Promi
     gymName: verification.payload?.gymName ?? licenseRecord.gymName,
     tier: verification.payload?.tier ?? licenseRecord.tier,
     maxMembers: verification.payload?.maxMembers ?? licenseRecord.maxMembers,
+    amountPaid: p?.amountPaid ?? licenseRecord.amountPaid ?? 0,
+    durationDays: calculatedDuration,
     currentMembersCount,
     daysRemaining: verification.daysRemaining,
+    activatedAt: licenseRecord.activatedAt.toISOString(),
     expiresAt: verification.payload?.expiresAt ?? licenseRecord.expiresAt.toISOString(),
+    renewalDate: verification.payload?.expiresAt ?? licenseRecord.expiresAt.toISOString(),
     inGracePeriod: verification.inGracePeriod,
     message: verification.message,
   }
@@ -140,8 +158,15 @@ export async function activateSystemLicense(rawKey: string): Promise<LicenseStat
   }
 
   const p = verification.payload
+  const duration =
+    p.durationDays ||
+    Math.round(
+      (new Date(p.expiresAt).getTime() - new Date(p.issuedAt).getTime()) /
+        (24 * 60 * 60 * 1000)
+    ) ||
+    365
 
-  // Save or replace license in DB
+  // Save or replace license in DB & transition installation state to ACTIVE
   await prisma.$transaction(async (tx) => {
     // Delete any old license records
     await tx.systemLicense.deleteMany()
@@ -154,11 +179,30 @@ export async function activateSystemLicense(rawKey: string): Promise<LicenseStat
         gymName: p.gymName,
         tier: p.tier,
         maxMembers: p.maxMembers,
+        amountPaid: p.amountPaid ?? 0,
+        durationDays: duration,
         features: JSON.stringify(p.features),
         issuedAt: new Date(p.issuedAt),
         expiresAt: new Date(p.expiresAt),
         gracePeriodDays: p.gracePeriodDays,
         status: verification.status,
+      },
+    })
+
+    // Update installation state to ACTIVE
+    await tx.systemInstallation.upsert({
+      where: { id: 'singleton' },
+      update: {
+        state: 'ACTIVE',
+        isActivated: true,
+        activatedAt: new Date(),
+      },
+      create: {
+        id: 'singleton',
+        state: 'ACTIVE',
+        isAccountSetupDone: true,
+        isActivated: true,
+        activatedAt: new Date(),
       },
     })
   })

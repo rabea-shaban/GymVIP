@@ -202,10 +202,20 @@ export const loginUser = async (
     metadata: { email: user.email, role: user.role },
   })
 
+  // Check system installation and setup stage
+  const { getSystemInstallationStatus, markInitialLoginDone } = await import('./installation.service.js')
+  const installation = await getSystemInstallationStatus()
+  if (!installation.isAccountSetupDone) {
+    await markInitialLoginDone()
+  }
+
   return {
     user: formatSafeUser(user),
     gym: formatSafeGym(user.gym),
     token,
+    installationState: installation.state,
+    requiresAccountSetup: !installation.isAccountSetupDone,
+    requiresActivation: !installation.isActivated,
   }
 }
 
@@ -228,9 +238,15 @@ export const getCurrentUserProfile = async (
     throw AppError.forbidden('اشتراك النادي الرياضي معطل أو غير نشط')
   }
 
+  const { getSystemInstallationStatus } = await import('./installation.service.js')
+  const installation = await getSystemInstallationStatus()
+
   return {
     user: formatSafeUser(user),
     gym: formatSafeGym(user.gym),
+    installationState: installation.state,
+    requiresAccountSetup: !installation.isAccountSetupDone,
+    requiresActivation: !installation.isActivated,
   }
 }
 

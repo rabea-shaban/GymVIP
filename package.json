@@ -12,6 +12,7 @@
     "build:backend": "npm run build --prefix Backend",
     "build:frontend": "npm run build --prefix Frontend",
     "license:generate": "node scripts/master-license-tool.js",
+    "system:fresh-install": "node scripts/fresh-install.js",
     "test:backend": "npm run test --prefix Backend",
     "install:all": "npm install --prefix Backend && npm install --prefix Frontend"
   },

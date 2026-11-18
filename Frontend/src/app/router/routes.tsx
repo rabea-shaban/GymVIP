@@ -1,7 +1,18 @@
-import { RouteObject, Navigate } from 'react-router-dom'
+import { RouteObject, Navigate, Outlet } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { GuestRoute } from '@/features/auth/components/GuestRoute'
+import { InstallationGuard } from '@/features/installation/components/InstallationGuard'
+import InitialAccountSetupPage from '@/features/installation/pages/InitialAccountSetupPage'
+import ActivationPage from '@/features/installation/pages/ActivationPage'
+
+const InstallationLayout: React.FC = () => {
+  return (
+    <InstallationGuard>
+      <Outlet />
+    </InstallationGuard>
+  )
+}
 
 // Design System Showcase Page
 import DesignSystemPage from '@/pages/DesignSystem/DesignSystemPage'
@@ -62,52 +73,65 @@ const RoleBasedDashboardRouter: React.FC = () => {
 }
 
 export const routes: RouteObject[] = [
-  // Root Redirect to Login
   {
-    path: '/',
-    element: <Navigate to="/login" replace />,
-  },
-
-  // Design System Showcase Route
-  {
-    path: '/design-system',
-    element: <DesignSystemPage />,
-  },
-
-  // Gym Onboarding / Setup Wizard Route
-  {
-    path: '/setup',
-    element: <GymSetupWizardPage />,
-  },
-  {
-    path: '/onboarding',
-    element: <GymSetupWizardPage />,
-  },
-
-  // Guest Routes (Auth)
-  {
-    element: <GuestRoute />,
+    element: <InstallationLayout />,
     children: [
+      // Root Redirect to Login
       {
-        path: '/login',
-        element: <LoginPage />,
+        path: '/',
+        element: <Navigate to="/login" replace />,
+      },
+
+      // Initial Account Setup & System Activation Pages
+      {
+        path: '/initial-setup',
+        element: <InitialAccountSetupPage />,
       },
       {
-        path: '/register',
-        element: <RegisterPage />,
+        path: '/activation',
+        element: <ActivationPage />,
       },
-    ],
-  },
 
-  // Authenticated App Shell Routes
-  {
-    path: '/app',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
-    children: [
+      // Design System Showcase Route
+      {
+        path: '/design-system',
+        element: <DesignSystemPage />,
+      },
+
+      // Gym Onboarding / Setup Wizard Route
+      {
+        path: '/setup',
+        element: <GymSetupWizardPage />,
+      },
+      {
+        path: '/onboarding',
+        element: <GymSetupWizardPage />,
+      },
+
+      // Guest Routes (Auth)
+      {
+        element: <GuestRoute />,
+        children: [
+          {
+            path: '/login',
+            element: <LoginPage />,
+          },
+          {
+            path: '/register',
+            element: <RegisterPage />,
+          },
+        ],
+      },
+
+      // Authenticated App Shell Routes
+      {
+        path: '/app',
+        element: (
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        ),
+        children: [
       {
         index: true,
         element: <RoleBasedDashboardRouter />,
@@ -412,21 +436,23 @@ export const routes: RouteObject[] = [
     ],
   },
 
-  // Standalone Error Pages
-  {
-    path: '/403',
-    element: <ForbiddenPage />,
-  },
-  {
-    path: '/unauthorized',
-    element: <ForbiddenPage />,
-  },
-  {
-    path: '/500',
-    element: <ServerErrorPage />,
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />,
+      // Standalone Error Pages
+      {
+        path: '/403',
+        element: <ForbiddenPage />,
+      },
+      {
+        path: '/unauthorized',
+        element: <ForbiddenPage />,
+      },
+      {
+        path: '/500',
+        element: <ServerErrorPage />,
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
+      },
+    ],
   },
 ]

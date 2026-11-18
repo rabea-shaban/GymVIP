@@ -8,13 +8,13 @@
 [![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
-[![MySQL](https://img.shields.io/badge/MySQL-005C84?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
 
-**نظام سحابي متكامل واحترافي لإدارة الصالات الرياضية ومراكز اللياقة البدنية (Gym Management SaaS)**
+**نظام تجاري متكامل ومستقل لإدارة الصالات الرياضية ومراكز اللياقة البدنية (Standalone On-Premise Gym SaaS)**
 <br>
-*مصمم خصيصاً باللغة العربية مع دعم كامل للجنيه المصري (`ج.م`) وأرقام الهواتف المصرية ومصادقة معززة.*
+*يعمل بدون الحاجة لاتصال دائم بالإنترنت (Offline-First) بقاعدة بيانات SQLite مضمنة، محمي بنظام تراخيص رقمي غير متماثل (RSA-2048/4096) ومربوط ببصمة العتاد (Hardware Machine ID)، مع دعم كامل للجنيه المصري (`ج.م`) والنسخ الاحتياطي التلقائي.*
 
 </div>
 
@@ -55,7 +55,9 @@
 ### الواجهة الخلفية (Backend)
 - **Runtime:** Node.js (v20+) + Express
 - **Language:** TypeScript
-- **Database & ORM:** MySQL 8.0+ عبر Prisma ORM
+- **Database & ORM:** SQLite مضمن عبر Prisma ORM (بدون خوادم خارجية مثل MySQL أو XAMPP)
+- **Licensing & Protection:** Asymmetric RSA-2048/4096 Node-Locked Licensing (مرتبط ببصمة المعالج واللوحة الأم)
+- **Backups:** نسخ احتياطي يومي تلقائي واستعادة كاملة بضغطة زر
 - **Authentication & Security:** JWT (HTTPOnly Cookie), Bcrypt, Helmet, CORS, Express Rate Limit
 - **Validation:** Zod Schema Validation
 

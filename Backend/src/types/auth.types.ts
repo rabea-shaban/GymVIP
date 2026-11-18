@@ -43,4 +43,7 @@ export interface SafeGym {
 export interface AuthSuccessData {
   user: SafeUser
   gym: SafeGym
+  installationState?: string
+  requiresAccountSetup?: boolean
+  requiresActivation?: boolean
 }
