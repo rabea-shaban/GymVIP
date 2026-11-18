@@ -206,7 +206,11 @@ export const LicenseSettingsTab: React.FC = () => {
         </p>
       </div>
 
-      <LicenseLockModal isOpen={showModal} />
+      <LicenseLockModal
+        isOpen={showModal}
+        isManual={true}
+        onClose={() => setShowModal(false)}
+      />
     </div>
   )
 }

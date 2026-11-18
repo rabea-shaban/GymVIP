@@ -62,7 +62,11 @@ export const LicenseWarningBanner: React.FC = () => {
         </div>
       </div>
 
-      <LicenseLockModal isOpen={showModal} />
+      <LicenseLockModal
+        isOpen={showModal}
+        isManual={true}
+        onClose={() => setShowModal(false)}
+      />
     </>
   )
 }

@@ -8,23 +8,30 @@ import {
   Lock,
   Sparkles,
   AlertTriangle,
+  X,
 } from 'lucide-react'
 import { useLicense } from '../hooks/useLicense'
 import { notifySuccess } from '../../../lib/sweetAlert'
 
 interface LicenseLockModalProps {
   isOpen: boolean
+  onClose?: () => void
+  isManual?: boolean
 }
 
-export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({ isOpen }) => {
+export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
+  isOpen,
+  onClose,
+  isManual = false,
+}) => {
   const { license, activate, isActivating } = useLicense()
   const [licenseKeyInput, setLicenseKeyInput] = useState('')
   const [copied, setCopied] = useState(false)
 
   if (!isOpen || !license) return null
 
-  // If active and valid, don't show the modal
-  if (license.isValid && !license.inGracePeriod) return null
+  // If active, valid, and not manually requested, do not force display
+  if (!isManual && license.isValid && !license.inGracePeriod) return null
 
   const machineId = license.machineId || 'جاري استخراج كود الجهاز...'
 
@@ -43,6 +50,7 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({ isOpen }) =>
     try {
       await activate(licenseKeyInput.trim())
       setLicenseKeyInput('')
+      if (onClose) onClose()
     } catch {
       // Error handled by mutation hook
     }
@@ -59,6 +67,18 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({ isOpen }) =>
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-300"
     >
       <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden my-8">
+        {/* Close Button if manually opened */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 left-4 p-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors z-20 cursor-pointer"
+            title="إغلاق النافذة"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Header Ribbon */}
         <div className="h-3 w-full bg-gradient-to-r from-amber-500 via-primary-600 to-indigo-600" />
 
@@ -74,13 +94,17 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({ isOpen }) =>
             </div>
 
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {license.status === 'EXPIRED'
+              {isManual
+                ? 'تحديث / إدخال كود ترخيص جديد'
+                : license.status === 'EXPIRED'
                 ? 'انتهت صلاحية ترخيص GymVIP'
                 : 'تفعيل نسخة نظام GymVIP'}
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md">
-              {license.message ||
-                'هذه النسخة مخصصة لجهازك وتتطلب كود تفعيل مشفر لتشغيل واستخدام كافة خدمات النادي الرياضي.'}
+              {isManual
+                ? 'يمكنك هنا إدخال كود ترخيص جديد لتجديد الاشتراك، ترقية الباقة، أو تغيير مدة الصلاحية.'
+                : license.message ||
+                  'هذه النسخة مخصصة لجهازك وتتطلب كود تفعيل مشفر لتشغيل واستخدام كافة خدمات النادي الرياضي.'}
             </p>
           </div>
 
