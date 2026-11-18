@@ -19,7 +19,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   OWNER: { label: 'مالك الصالة الرياضية (Owner)', color: 'bg-amber-100 text-amber-900 border-amber-300' },
   MANAGER: { label: 'مدير الصالة (Manager)', color: 'bg-blue-100 text-blue-900 border-blue-300' },
   RECEPTIONIST: { label: 'موظف الاستقبال (Receptionist)', color: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  TRAINER: { label: 'المدرب الرياضي (Trainer)', color: 'bg-purple-100 text-purple-900 border-purple-300' },
+  TRAINER: { label: 'المدرب الرياضي (Trainer)', color: 'bg-amber-100 text-amber-900 border-amber-300' },
   MEMBER: { label: 'عضو رياضي (Member)', color: 'bg-zinc-100 text-zinc-900 border-zinc-300' },
 }
 

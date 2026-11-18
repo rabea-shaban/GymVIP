@@ -16,12 +16,12 @@
   --color-primary-700: #937415;
 
   /* 2. Neutrals & Canvas */
-  --color-black: #0B0B0B;
+  --color-black: #000000;
   --color-white: #FFFFFF;
   --color-background: #F8F8F8;
   --color-surface: #FFFFFF;
   --color-surface-hover: #FAFAFA;
-  --color-surface-card-dark: #141414;
+  --color-surface-card-dark: #000000;
   --color-surface-dark-border: #27272A;
   --color-border: #E4E4E7;
   --color-border-subtle: #F4F4F5;

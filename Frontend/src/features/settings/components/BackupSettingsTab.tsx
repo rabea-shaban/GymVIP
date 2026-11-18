@@ -48,21 +48,21 @@ export const BackupSettingsTab: React.FC = () => {
         </div>
 
         {/* Auto Backup Status Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-white dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#D4AF37]" />
               النسخ الاحتياطي التلقائي
             </span>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800 flex items-center gap-1">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
               مفعل يومياً
             </span>
           </div>
           <div className="text-sm font-semibold text-slate-900 dark:text-white">
-            الجدولة: <span className="text-indigo-600 dark:text-indigo-400">كل 24 ساعة تلقائياً</span>
+            الجدولة: <span className="text-amber-400 font-bold">كل 24 ساعة تلقائياً</span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
             يقوم النظام تلقائياً بإنشاء نسخة احتياطية يومية في مجلد <code className="text-xs font-mono">backups/</code> مع
             الاحتفاظ بآخر 30 نسخة لحماية مساحة القرص.
           </p>
@@ -70,7 +70,7 @@ export const BackupSettingsTab: React.FC = () => {
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-4">
         <div>
           <h4 className="text-sm font-bold text-slate-900 dark:text-white">
             النسخ الاحتياطية المحفوظة ({backups.length})
@@ -141,7 +141,7 @@ export const BackupSettingsTab: React.FC = () => {
                         className={`text-[11px] font-bold px-2 py-0.5 rounded ${
                           b.backupType === 'AUTO'
                             ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300'
-                            : 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300'
+                            : 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
                         }`}
                       >
                         {b.backupType === 'AUTO' ? 'تلقائي' : 'يدوي'}

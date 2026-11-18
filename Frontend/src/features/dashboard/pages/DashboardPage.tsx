@@ -289,11 +289,11 @@ export const DashboardPage: React.FC = () => {
         ) : (
           <div
             onClick={() => navigate('/app/trainers')}
-            className="bg-white rounded-2xl border border-zinc-200/90 p-5 shadow-2xs hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
+            className="bg-white rounded-2xl border border-zinc-200/90 p-5 shadow-2xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer group"
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-zinc-500">المدربين</span>
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 group-hover:scale-105 transition-transform">
                 <UserCheck className="w-5 h-5" />
               </div>
             </div>
@@ -304,7 +304,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs text-zinc-400 font-bold">كابتن معتمد</span>
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-100 text-[11px] text-zinc-500 font-medium">
-              <span className="text-purple-700 font-bold">نشط بالخدمة: {trainers.active}</span>
+              <span className="text-amber-700 font-bold">نشط بالخدمة: {trainers.active}</span>
               <span>طاقم التدريب</span>
             </div>
           </div>

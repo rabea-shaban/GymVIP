@@ -71,23 +71,23 @@ export const InitialAccountSetupPage: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className="min-h-screen w-full bg-[#0B0B0B] text-white flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-cairo selection:bg-[#D4AF37] selection:text-black relative overflow-hidden"
+      className="min-h-screen w-full bg-[#000000] text-white flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-cairo selection:bg-[#D4AF37] selection:text-black relative overflow-hidden"
     >
       {/* Background Ambient Glows */}
-      <div className="absolute top-1/4 -right-24 w-96 h-96 bg-primary-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 -left-24 w-96 h-96 bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-xl bg-zinc-900/90 border border-zinc-800 rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl backdrop-blur-xl relative z-10">
+      <div className="w-full max-w-xl bg-[#0B0B0B] border border-zinc-800 rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl backdrop-blur-xl relative z-10">
         
         {/* Header & Step Indicator */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary-500/10 border border-primary-500/30 text-primary-400 text-xs font-semibold mb-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-4">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             المرحلة 1 من 2: إعداد الحساب الأولي
           </div>
 
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-primary-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10">
               <UserCheck className="w-8 h-8" />
             </div>
           </div>
@@ -211,7 +211,7 @@ export const InitialAccountSetupPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSettingUp}
-            className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-primary-500 to-amber-600 hover:from-amber-600 hover:to-primary-600 text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#D4AF37] hover:bg-[#c59f2e] text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSettingUp ? (
               <>

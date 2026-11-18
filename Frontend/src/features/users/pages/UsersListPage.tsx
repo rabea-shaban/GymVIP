@@ -640,14 +640,14 @@ export const UsersListPage: React.FC = () => {
                           u.role === 'OWNER'
                             ? 'bg-amber-50 text-amber-900 border border-amber-200'
                             : u.role === 'MANAGER'
-                            ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                            ? 'bg-zinc-100 text-zinc-900 border border-zinc-300'
                             : u.role === 'RECEPTIONIST'
                             ? 'bg-blue-50 text-blue-900 border border-blue-200'
                             : 'bg-emerald-50 text-emerald-900 border border-emerald-200'
                         }`}
                       >
                         {u.role === 'OWNER' && <Crown className="w-3.5 h-3.5 text-amber-600" />}
-                        {u.role === 'MANAGER' && <Shield className="w-3.5 h-3.5 text-purple-600" />}
+                        {u.role === 'MANAGER' && <Shield className="w-3.5 h-3.5 text-zinc-700" />}
                         {u.role === 'RECEPTIONIST' && <Receipt className="w-3.5 h-3.5 text-blue-600" />}
                         {u.role === 'TRAINER' && <Dumbbell className="w-3.5 h-3.5 text-emerald-600" />}
                         <span>{u.roleLabel}</span>

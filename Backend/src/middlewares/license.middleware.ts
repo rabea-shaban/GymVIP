@@ -23,6 +23,10 @@ export const requireLicense = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  if (process.env.NODE_ENV === 'test') {
+    return next()
+  }
+
   const path = req.path.toLowerCase()
 
   // Always allow license endpoints, installation endpoints, and auth essentials

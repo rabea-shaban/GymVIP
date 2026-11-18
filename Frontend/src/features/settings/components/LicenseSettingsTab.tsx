@@ -82,13 +82,13 @@ export const LicenseSettingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* Top Banner Card */}
-      <div className="bg-gradient-to-l from-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Top Banner Card - Deep Pure Black & Gold */}
+      <div className="bg-[#000000] border border-zinc-800 text-white rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-[#D4AF37]/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-amber-400">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400">
               {license.isValid ? (
                 <ShieldCheck className="w-8 h-8 text-emerald-400" />
               ) : (
@@ -104,7 +104,7 @@ export const LicenseSettingsTab: React.FC = () => {
                   {statusBadge.label}
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-1">
+              <p className="text-xs text-zinc-400 mt-1">
                 باقة الترخيص:{' '}
                 <span className="font-semibold text-white">{license.tier || 'PRO'}</span> — مرخصة
                 لهذا الجهاز بعقد حصري
@@ -116,7 +116,7 @@ export const LicenseSettingsTab: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all shadow-sm"
             >
               <Key className="w-4 h-4 text-amber-400" />
               تحديث / إدخال كود جديد
@@ -135,7 +135,7 @@ export const LicenseSettingsTab: React.FC = () => {
       </div>
 
       {/* Primary Commercial License Specifications Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+      <div className="bg-white dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-4">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -187,7 +187,7 @@ export const LicenseSettingsTab: React.FC = () => {
 
               <tr>
                 <td className="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-indigo-400" />
+                  <Clock className="w-4 h-4 text-amber-400" />
                   مدة الترخيص (License Duration)
                 </td>
                 <td className="py-3 px-4 font-bold">
@@ -244,16 +244,16 @@ export const LicenseSettingsTab: React.FC = () => {
       {/* Grid of Secondary Specs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Machine ID */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2">
+        <div className="bg-white dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
-              <Key className="w-4 h-4 text-primary-500" />
+              <Key className="w-4 h-4 text-[#D4AF37]" />
               بصمة الجهاز المعتمدة (Machine ID)
             </span>
             <button
               type="button"
               onClick={handleCopy}
-              className="text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1 text-[11px] cursor-pointer"
+              className="text-[#D4AF37] hover:underline inline-flex items-center gap-1 text-[11px] cursor-pointer"
             >
               {copied ? (
                 <>
@@ -268,13 +268,13 @@ export const LicenseSettingsTab: React.FC = () => {
               )}
             </button>
           </div>
-          <div className="font-mono text-sm font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 px-3 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 tracking-wide text-center">
+          <div className="font-mono text-sm font-bold text-slate-800 dark:text-[#D4AF37] bg-slate-50 dark:bg-[#0B0B0B] px-3 py-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 tracking-wide text-center">
             {license.machineId}
           </div>
         </div>
 
         {/* Member Usage Cap */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2">
+        <div className="bg-white dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <Users className="w-4 h-4 text-emerald-500" />
@@ -284,7 +284,7 @@ export const LicenseSettingsTab: React.FC = () => {
               {license.currentMembersCount || 0} / {license.maxMembers || 500} عضو
             </span>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-zinc-900 rounded-full h-2.5 overflow-hidden">
             <div
               className={`h-2.5 rounded-full transition-all duration-500 ${
                 membersPercent >= 90
@@ -303,7 +303,7 @@ export const LicenseSettingsTab: React.FC = () => {
       </div>
 
       {/* Security Architecture Info */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-xs text-slate-600 dark:text-slate-400 space-y-2">
+      <div className="bg-slate-50 dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 text-xs text-slate-600 dark:text-zinc-400 space-y-2">
         <div className="font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-500" />
           معايير الحماية والتشفير في رخصة GymVIP:

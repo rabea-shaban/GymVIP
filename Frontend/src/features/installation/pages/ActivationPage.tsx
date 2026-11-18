@@ -112,13 +112,13 @@ export const ActivationPage: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className="min-h-screen w-full bg-[#0B0B0B] text-white flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-cairo selection:bg-[#D4AF37] selection:text-black relative overflow-hidden"
+      className="min-h-screen w-full bg-[#000000] text-white flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-cairo selection:bg-[#D4AF37] selection:text-black relative overflow-hidden"
     >
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-1/4 -left-24 w-96 h-96 bg-primary-500/10 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-1/4 -left-24 w-96 h-96 bg-amber-500/5 rounded-full blur-[130px] pointer-events-none" />
 
-      <div className="w-full max-w-xl bg-zinc-900/90 border border-zinc-800 rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl backdrop-blur-xl relative z-10">
+      <div className="w-full max-w-xl bg-[#0B0B0B] border border-zinc-800 rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl backdrop-blur-xl relative z-10">
         
         {/* Header */}
         <div className="text-center mb-6">
@@ -149,7 +149,7 @@ export const ActivationPage: React.FC = () => {
         </div>
 
         {/* Machine ID Box */}
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 mb-5 shadow-inner">
+        <div className="bg-[#000000] border border-zinc-800 rounded-2xl p-4 sm:p-5 mb-5 shadow-inner">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5 text-amber-400" />
@@ -173,7 +173,7 @@ export const ActivationPage: React.FC = () => {
               )}
             </button>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-center font-mono font-extrabold text-amber-300 tracking-wider text-sm sm:text-base select-all">
+          <div className="bg-[#0B0B0B] border border-zinc-800 rounded-xl px-4 py-2.5 text-center font-mono font-extrabold text-amber-300 tracking-wider text-sm sm:text-base select-all">
             {machineId}
           </div>
           <p className="text-[11px] text-zinc-500 mt-2 text-center">
@@ -272,7 +272,7 @@ export const ActivationPage: React.FC = () => {
           <button
             type="submit"
             disabled={isActivating || !validation.isValid}
-            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-primary-500 to-amber-600 hover:from-amber-600 hover:to-primary-600 text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#D4AF37] hover:bg-[#c59f2e] text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {isActivating ? (
               <>
