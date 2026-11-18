@@ -7,7 +7,7 @@ import {
   Check,
   Calendar,
   Users,
-  Sparkles,
+  Shield,
   Send,
   DollarSign,
   Clock,
@@ -138,7 +138,7 @@ export const LicenseSettingsTab: React.FC = () => {
       <div className="bg-white dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-4">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Shield className="w-4 h-4 text-amber-400" />
             بيانات ومعلومات ترخيص النظام (System License / Subscription Information)
           </div>
           <span className="text-xs text-slate-400">نسخة تجارية مفعلة ومقيدة بالعتاد</span>
@@ -167,7 +167,7 @@ export const LicenseSettingsTab: React.FC = () => {
 
               <tr>
                 <td className="py-3 px-4 font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
                   نوع الترخيص (License Type)
                 </td>
                 <td className="py-3 px-4 font-bold font-mono text-sm text-primary-600 dark:text-primary-400">
@@ -305,7 +305,7 @@ export const LicenseSettingsTab: React.FC = () => {
       {/* Security Architecture Info */}
       <div className="bg-slate-50 dark:bg-[#000000] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 text-xs text-slate-600 dark:text-zinc-400 space-y-2">
         <div className="font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-500" />
+          <ShieldCheck className="w-4 h-4 text-amber-500" />
           معايير الحماية والتشفير في رخصة GymVIP:
         </div>
         <p className="leading-relaxed">

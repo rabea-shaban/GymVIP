@@ -6,7 +6,6 @@ import {
   Mail,
   Eye,
   EyeOff,
-  Sparkles,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
@@ -82,7 +81,7 @@ export const InitialAccountSetupPage: React.FC = () => {
         {/* Header & Step Indicator */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <UserCheck className="w-3.5 h-3.5 text-amber-400" />
             المرحلة 1 من 2: إعداد الحساب الأولي
           </div>
 
@@ -211,11 +210,15 @@ export const InitialAccountSetupPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSettingUp}
-            className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#D4AF37] hover:bg-[#c59f2e] text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className={`w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+              isSettingUp
+                ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 cursor-not-allowed'
+                : 'bg-[#D4AF37] hover:bg-[#C29F2F] text-black shadow-xl shadow-[#D4AF37]/25 cursor-pointer active:scale-[0.99]'
+            }`}
           >
             {isSettingUp ? (
               <>
-                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 جاري التشفير وحفظ البيانات...
               </>
             ) : (

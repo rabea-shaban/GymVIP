@@ -5,7 +5,6 @@ import {
   Copy,
   Check,
   Send,
-  Sparkles,
   AlertTriangle,
   ClipboardPaste,
   RotateCcw,
@@ -123,7 +122,7 @@ export const ActivationPage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
             المرحلة 2 من 2: تفعيل ترخيص المنظومة
           </div>
 
@@ -272,16 +271,20 @@ export const ActivationPage: React.FC = () => {
           <button
             type="submit"
             disabled={isActivating || !validation.isValid}
-            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#D4AF37] hover:bg-[#c59f2e] text-black font-extrabold text-sm shadow-xl shadow-amber-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className={`w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+              !validation.isValid || isActivating
+                ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 cursor-not-allowed'
+                : 'bg-[#D4AF37] hover:bg-[#C29F2F] text-black shadow-xl shadow-[#D4AF37]/25 cursor-pointer active:scale-[0.99]'
+            }`}
           >
             {isActivating ? (
               <>
-                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 جاري فك التشفير والتحقق من التوقيع الرقمي...
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-black" />
+                <CheckCircle2 className="w-4 h-4" />
                 تفعيل وتشغيل النظام الآن
               </>
             )}

@@ -6,7 +6,6 @@ import {
   Check,
   Send,
   Lock,
-  Sparkles,
   AlertTriangle,
   X,
   ClipboardPaste,
@@ -143,9 +142,7 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
           </button>
         )}
 
-        {/* Clean Luxury Gold Accent Line (No purple/indigo) */}
-        <div className="h-1.5 w-full bg-[#D4AF37]" />
-
+        {/* Modal Content */}
         <div className="p-6 sm:p-8">
           {/* Badge & Title */}
           <div className="flex flex-col items-center text-center">
@@ -295,16 +292,20 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
             <button
               type="submit"
               disabled={isActivating || !validation.isValid}
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-[#D4AF37] hover:bg-[#c59f2e] text-black font-extrabold text-sm shadow-xl shadow-[#D4AF37]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className={`w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                !validation.isValid || isActivating
+                  ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 cursor-not-allowed'
+                  : 'bg-[#D4AF37] hover:bg-[#C29F2F] text-black shadow-lg shadow-[#D4AF37]/25 cursor-pointer active:scale-[0.99]'
+              }`}
             >
               {isActivating ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   جاري فك التشفير والتحقق من التوقيع الرقمي...
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 text-black" />
+                  <CheckCircle2 className="w-4 h-4" />
                   تفعيل وتشغيل النظام الآن
                 </>
               )}

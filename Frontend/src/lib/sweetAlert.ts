@@ -292,6 +292,6 @@ export const showLicenseActivatedAlert = async ({
     `,
     icon: 'success',
     iconColor: '#10b981',
-    confirmButtonText: 'ابدأ العمل بالنظام الآن ✨',
+    confirmButtonText: 'ابدأ العمل بالنظام الآن',
   })
 }
