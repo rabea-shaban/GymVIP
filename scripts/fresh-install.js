@@ -27,22 +27,24 @@ async function runFreshInstall() {
   await prisma.payment.deleteMany();
   await prisma.subscription.deleteMany();
   await prisma.member.deleteMany();
+  await prisma.trainer.deleteMany();
+  await prisma.membershipPlan.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.systemLicense.deleteMany();
   await prisma.backupRecord.deleteMany();
 
-  console.log('✅ تم تصفير بيانات الأعضاء والاشتراكات والمدفوعات والتراخيص القديمة.');
+  console.log('✅ تم مسح وتصفير كافة الخطط والمدربين والأعضاء والاشتراكات والمدفوعات والتراخيص.');
 
-  // 2. Setup Default Primary Gym Tenant
+  // 2. Setup Clean Neutral Gym Tenant
   const gym = await prisma.gym.upsert({
     where: { slug: 'gymvip-maadi' },
     update: {
-      name: 'جيم في أي بي - المركز الرئيسي',
-      phone: '01012345678',
-      email: 'maadi@gymvip.eg',
-      address: 'شارع النصر، المعادي، القاهرة',
-      city: 'القاهرة',
+      name: 'نادي رياضي',
+      phone: '',
+      email: 'admin@gymvip.eg',
+      address: '',
+      city: '',
       currency: 'EGP',
       timezone: 'Africa/Cairo',
       isActive: true,
@@ -55,12 +57,12 @@ async function runFreshInstall() {
       allowManualCheckout: true,
     },
     create: {
-      name: 'جيم في أي بي - المركز الرئيسي',
+      name: 'نادي رياضي',
       slug: 'gymvip-maadi',
-      phone: '01012345678',
-      email: 'maadi@gymvip.eg',
-      address: 'شارع النصر، المعادي، القاهرة',
-      city: 'القاهرة',
+      phone: '',
+      email: 'admin@gymvip.eg',
+      address: '',
+      city: '',
       currency: 'EGP',
       timezone: 'Africa/Cairo',
       isActive: true,
@@ -74,14 +76,14 @@ async function runFreshInstall() {
     },
   });
 
-  // 3. Reset or Create Default Initial Admin Account
+  // 3. Reset or Create Default Initial Admin Account Only (No trainers, no other users)
   const defaultPasswordHash = await bcrypt.hash('GymVIP2025#', 10);
   const initialAdminEmail = 'capt.ahmed@gymvip.eg';
 
-  // Delete all users except owner and trainer to keep database ultra-clean
+  // Delete all users except the single initial admin
   await prisma.user.deleteMany({
     where: {
-      email: { notIn: [initialAdminEmail, 'coach.tarek@gymvip.eg'] },
+      email: { not: initialAdminEmail },
     },
   });
 
@@ -93,7 +95,7 @@ async function runFreshInstall() {
       },
     },
     update: {
-      name: 'مدير النظام الرئيسي',
+      name: 'المدير الرئيسي',
       passwordHash: defaultPasswordHash,
       role: 'OWNER',
       isActive: true,
@@ -101,86 +103,18 @@ async function runFreshInstall() {
     },
     create: {
       gymId: gym.id,
-      name: 'مدير النظام الرئيسي',
+      name: 'المدير الرئيسي',
       email: initialAdminEmail,
-      phone: '01012345678',
+      phone: '',
       passwordHash: defaultPasswordHash,
       role: 'OWNER',
       isActive: true,
     },
   });
 
-  // 4. Ensure 4 Standard Membership Plans Exist
-  const standardPlans = [
-    { name: 'باقة شهرية - حديد ولياقة', price: 650, durationDays: 30 },
-    { name: 'باقة ربع سنوية - VIP', price: 1750, durationDays: 90 },
-    { name: 'باقة نصف سنوية - ذهبية', price: 3200, durationDays: 180 },
-    { name: 'باقة سنوية شاملة - ماسية', price: 5500, durationDays: 365 },
-  ];
+  console.log('✅ تم الاحتفاظ فقط بحساب المالك الرئيسي الافتراضي (بدون مدربين وبدون مستخدمين آخرين).');
 
-  for (const plan of standardPlans) {
-    await prisma.membershipPlan.upsert({
-      where: {
-        gymId_name: {
-          gymId: gym.id,
-          name: plan.name,
-        },
-      },
-      update: {
-        price: plan.price,
-        durationDays: plan.durationDays,
-        isActive: true,
-      },
-      create: {
-        gymId: gym.id,
-        name: plan.name,
-        price: plan.price,
-        durationDays: plan.durationDays,
-        currency: 'EGP',
-        isActive: true,
-      },
-    });
-  }
-
-  // 5. Ensure Trainer exists
-  const trainerUser = await prisma.user.upsert({
-    where: {
-      gymId_email: {
-        gymId: gym.id,
-        email: 'coach.tarek@gymvip.eg',
-      },
-    },
-    update: {
-      name: 'كابتن طارق يوسف',
-      role: 'TRAINER',
-      passwordHash: defaultPasswordHash,
-      isActive: true,
-    },
-    create: {
-      gymId: gym.id,
-      name: 'كابتن طارق يوسف',
-      email: 'coach.tarek@gymvip.eg',
-      phone: '01045678901',
-      role: 'TRAINER',
-      passwordHash: defaultPasswordHash,
-      isActive: true,
-    },
-  });
-
-  await prisma.trainer.upsert({
-    where: { userId: trainerUser.id },
-    update: {
-      specialization: 'كمال أجسام ولياقة بدنية وإعداد بدني شامل',
-    },
-    create: {
-      gymId: gym.id,
-      userId: trainerUser.id,
-      specialization: 'كمال أجسام ولياقة بدنية وإعداد بدني شامل',
-      bio: 'مدرب محترف معتمد دولياً بخبرة 8 سنوات في الإشراف الرياضي وتأهيل الرياضيين وتصميم الحميات الغذائية.',
-    },
-  });
-
-  // 6. Set System Installation Singleton to INITIAL_LOGIN
+  // 4. Set System Installation Singleton to INITIAL_LOGIN
   await prisma.systemInstallation.upsert({
     where: { id: 'singleton' },
     update: {
