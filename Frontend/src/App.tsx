@@ -1,11 +1,14 @@
 import React from 'react'
 import { AppProviders } from '@/app/providers/AppProviders'
 import { AppRouter } from '@/app/router'
+import { LicenseGuard } from '@/features/license/components/LicenseGuard'
 
 export const App: React.FC = () => {
   return (
     <AppProviders>
-      <AppRouter />
+      <LicenseGuard>
+        <AppRouter />
+      </LicenseGuard>
     </AppProviders>
   )
 }

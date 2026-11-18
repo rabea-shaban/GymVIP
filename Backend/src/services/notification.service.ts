@@ -13,7 +13,7 @@ export const formatNotificationDto = (notification: {
   id: string
   gymId: string
   recipientUserId: string
-  type: NotificationType
+  type: NotificationType | string
   title: string
   message: string
   entityType: string | null
@@ -26,7 +26,7 @@ export const formatNotificationDto = (notification: {
   id: notification.id,
   gymId: notification.gymId,
   recipientUserId: notification.recipientUserId,
-  type: notification.type,
+  type: notification.type as NotificationType,
   title: notification.title,
   message: notification.message,
   entityType: notification.entityType,
@@ -45,7 +45,7 @@ export const getEligibleRecipients = async (
   excludeRoles: Role[] = [Role.TRAINER]
 ): Promise<{ id: string; role: Role }[]> => {
   try {
-    return await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       where: {
         gymId,
         isActive: true,
@@ -56,6 +56,7 @@ export const getEligibleRecipients = async (
         role: true,
       },
     })
+    return users.map((u) => ({ id: u.id, role: u.role as Role }))
   } catch (err) {
     logger.warn('Failed to fetch eligible recipients for notification:', err)
     return []

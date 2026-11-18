@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { Role } from '@prisma/client'
 import { prisma } from '../config/database.js'
 import { AppError } from '../utils/appError.util.js'
 import { verifyAuthToken } from '../utils/jwt.util.js'
@@ -71,7 +72,7 @@ export const requireAuth = async (
       gymId: user.gymId,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: user.role as Role,
     }
 
     next()

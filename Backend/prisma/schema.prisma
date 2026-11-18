@@ -2,19 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-}
-
-enum Role {
-  OWNER
-  MANAGER
-  RECEPTIONIST
-  TRAINER
 }
 
 /// Gym model representing a fitness club / facility tenant in GymVIP SaaS
@@ -26,7 +19,7 @@ model Gym {
   email          String?
   address        String?
   city           String?
-  logo           String?  @db.MediumText
+  logo           String?
   currency       String   @default("EGP")
   timezone       String   @default("Africa/Cairo")
   isActive       Boolean  @default(true)
@@ -36,9 +29,9 @@ model Gym {
 
   // Feature 15: Gym Settings & Business Preferences
   subscriptionReminderEnabled Boolean  @default(true)
-  subscriptionReminderDays    Json?
+  subscriptionReminderDays    String?
   subscriptionFreezeEnabled   Boolean  @default(true)
-  allowedFreezeDurations      Json?
+  allowedFreezeDurations      String?
   maxFreezeDays               Int      @default(90)
   allowManualCheckout         Boolean  @default(true)
 
@@ -64,9 +57,9 @@ model User {
   name         String
   email        String
   phone        String?
-  avatarUrl    String?   @db.MediumText
+  avatarUrl    String?
   passwordHash String
-  role         Role      @default(OWNER)
+  role         String    @default("OWNER")
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
@@ -92,7 +85,7 @@ model Trainer {
   gymId          String
   userId         String   @unique
   specialization String?
-  bio            String?  @db.Text
+  bio            String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -101,11 +94,6 @@ model Trainer {
 
   @@index([gymId])
   @@map("trainers")
-}
-
-enum Gender {
-  MALE
-  FEMALE
 }
 
 /// SystemHealth model used for database connectivity checks
@@ -126,13 +114,13 @@ model Member {
   name                  String
   phone                 String
   email                 String?
-  gender                Gender?
+  gender                String?
   dateOfBirth           DateTime?
   address               String?
   emergencyContactName  String?
   emergencyContactPhone String?
-  notes                 String?   @db.Text
-  avatarUrl             String?   @db.MediumText
+  notes                 String?
+  avatarUrl             String?
   isActive              Boolean   @default(true)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -156,9 +144,9 @@ model MembershipPlan {
   id           String   @id @default(uuid())
   gymId        String
   name         String
-  description  String?  @db.Text
+  description  String?
   durationDays Int
-  price        Decimal  @db.Decimal(10, 2)
+  price        Decimal
   currency     String   @default("EGP")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -174,40 +162,33 @@ model MembershipPlan {
   @@map("membership_plans")
 }
 
-enum SubscriptionStatus {
-  ACTIVE
-  FROZEN
-  EXPIRED
-  CANCELLED
-}
-
 /// Subscription model representing purchased membership periods in GymVIP SaaS
 model Subscription {
-  id           String             @id @default(uuid())
+  id           String   @id @default(uuid())
   gymId        String
   memberId     String
   planId       String
 
   planName     String
-  planPrice    Decimal            @db.Decimal(10, 2)
+  planPrice    Decimal
   durationDays Int
-  currency     String             @default("EGP")
+  currency     String   @default("EGP")
 
   startDate    DateTime
   endDate      DateTime
 
-  status       SubscriptionStatus @default(ACTIVE)
+  status       String   @default("ACTIVE")
 
-  notes        String?            @db.Text
+  notes        String?
 
   // Feature 16: Subscription Cancellation & Controlled Adjustments
   cancelledAt        DateTime?
   cancellationReason String?
-  cancellationNotes  String?              @db.Text
+  cancellationNotes  String?
   cancelledByUserId  String?
 
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   gym             Gym                  @relation(fields: [gymId], references: [id], onDelete: Cascade)
   member          Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -221,40 +202,25 @@ model Subscription {
   @@index([memberId])
   @@index([planId])
   @@index([gymId, status])
-  @@index([gymId, startDate])
+  @@index([endDate])
   @@index([gymId, endDate])
-  @@index([cancelledByUserId])
   @@map("subscriptions")
-}
-
-enum PaymentMethod {
-  CASH
-  WALLET
-}
-
-enum WalletProvider {
-  VODAFONE_CASH
-  ORANGE_CASH
-  ETISALAT_CASH
-  WE
-  INSTAPAY
-  OTHER
 }
 
 /// Payment model representing financial transactions in GymVIP SaaS
 model Payment {
-  id                   String          @id @default(uuid())
+  id                   String   @id @default(uuid())
   gymId                String
   subscriptionId       String
   memberId             String
-  amount               Decimal         @db.Decimal(10, 2)
-  currency             String          @default("EGP")
-  method               PaymentMethod
-  walletProvider       WalletProvider?
+  amount               Decimal
+  currency             String   @default("EGP")
+  method               String
+  walletProvider       String?
   transactionReference String?
-  notes                String?         @db.Text
+  notes                String?
   createdByUserId      String
-  createdAt            DateTime        @default(now())
+  createdAt            DateTime @default(now())
 
   gym           Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
   subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
@@ -305,7 +271,7 @@ model SubscriptionFreeze {
   startDate       DateTime
   endDate         DateTime
   days            Int
-  reason          String?  @db.Text
+  reason          String?
   createdByUserId String
   createdAt       DateTime @default(now())
 
@@ -320,28 +286,20 @@ model SubscriptionFreeze {
   @@map("subscription_freezes")
 }
 
-enum NotificationType {
-  SUBSCRIPTION_EXPIRING
-  SUBSCRIPTION_EXPIRED
-  SUBSCRIPTION_RENEWED
-  SUBSCRIPTION_FROZEN
-  PAYMENT_RECEIVED
-}
-
 /// Notification model representing in-app alerts and notifications in GymVIP SaaS
 model Notification {
-  id               String           @id @default(uuid())
+  id               String   @id @default(uuid())
   gymId            String
   recipientUserId  String
-  type             NotificationType
+  type             String
   title            String
-  message          String           @db.Text
+  message          String
   entityType       String?
   entityId         String?
-  isRead           Boolean          @default(false)
+  isRead           Boolean  @default(false)
   readAt           DateTime?
   deduplicationKey String?
-  createdAt        DateTime         @default(now())
+  createdAt        DateTime @default(now())
 
   gym           Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
   recipientUser User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
@@ -363,10 +321,10 @@ model AuditLog {
   action      String
   entityType  String
   entityId    String?
-  description String   @db.Text
-  metadata    Json?
-  beforeData  Json?
-  afterData   Json?
+  description String
+  metadata    String?
+  beforeData  String?
+  afterData   String?
   createdAt   DateTime @default(now())
 
   gym       Gym   @relation(fields: [gymId], references: [id], onDelete: Cascade)
@@ -379,3 +337,37 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// SystemLicense model representing local machine license and activation status
+model SystemLicense {
+  id              String    @id @default(uuid())
+  licenseKey      String
+  machineId       String
+  gymName         String
+  tier            String    @default("PRO")
+  maxMembers      Int       @default(500)
+  features        String?
+  issuedAt        DateTime
+  expiresAt       DateTime
+  gracePeriodDays Int       @default(3)
+  activatedAt     DateTime  @default(now())
+  lastVerifiedAt  DateTime  @default(now())
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("system_licenses")
+}
+
+/// BackupRecord model tracking automatic and manual SQLite backups
+model BackupRecord {
+  id            String    @id @default(uuid())
+  fileName      String    @unique
+  filePath      String
+  fileSizeBytes Int
+  backupType    String    @default("AUTO")
+  status        String    @default("COMPLETED")
+  checksum      String?
+  createdAt     DateTime  @default(now())
+
+  @@map("backup_records")
+}

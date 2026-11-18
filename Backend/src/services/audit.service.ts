@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client'
 import { prisma } from '../config/database.js'
 import { sanitizeAuditData } from '../utils/sanitize.util.js'
 import { AppError } from '../utils/appError.util.js'
@@ -8,6 +9,15 @@ import type {
   AuditLogListResult,
   AuditLogResponseDto,
 } from '../types/audit.types.js'
+
+const parseJsonField = (val: string | null): Record<string, any> | null => {
+  if (!val) return null
+  try {
+    return JSON.parse(val)
+  } catch {
+    return null
+  }
+}
 
 /**
  * Creates an immutable audit log entry.
@@ -42,9 +52,9 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
         entityType,
         entityId: entityId ?? null,
         description,
-        metadata: sanitizedMetadata ?? undefined,
-        beforeData: sanitizedBefore ?? undefined,
-        afterData: sanitizedAfter ?? undefined,
+        metadata: sanitizedMetadata ? JSON.stringify(sanitizedMetadata) : undefined,
+        beforeData: sanitizedBefore ? JSON.stringify(sanitizedBefore) : undefined,
+        afterData: sanitizedAfter ? JSON.stringify(sanitizedAfter) : undefined,
       },
     })
   } catch (error) {
@@ -122,18 +132,29 @@ export async function listAuditLogs(
     }),
   ])
 
+  const parseJsonField = (val: string | null): Record<string, any> | null => {
+    if (!val) return null
+    try {
+      return JSON.parse(val)
+    } catch {
+      return null
+    }
+  }
+
   const data: AuditLogResponseDto[] = records.map((log) => ({
     id: log.id,
     gymId: log.gymId,
     actorUserId: log.actorUserId,
-    actorUser: log.actorUser,
+    actorUser: log.actorUser
+      ? { id: log.actorUser.id, name: log.actorUser.name, role: log.actorUser.role as Role }
+      : null,
     action: log.action,
     entityType: log.entityType,
     entityId: log.entityId,
     description: log.description,
-    metadata: (log.metadata as Record<string, any>) ?? null,
-    beforeData: (log.beforeData as Record<string, any>) ?? null,
-    afterData: (log.afterData as Record<string, any>) ?? null,
+    metadata: parseJsonField(log.metadata),
+    beforeData: parseJsonField(log.beforeData),
+    afterData: parseJsonField(log.afterData),
     createdAt: log.createdAt,
   }))
 
@@ -179,14 +200,16 @@ export async function getAuditLogById(
     id: log.id,
     gymId: log.gymId,
     actorUserId: log.actorUserId,
-    actorUser: log.actorUser,
+    actorUser: log.actorUser
+      ? { id: log.actorUser.id, name: log.actorUser.name, role: log.actorUser.role as Role }
+      : null,
     action: log.action,
     entityType: log.entityType,
     entityId: log.entityId,
     description: log.description,
-    metadata: (log.metadata as Record<string, any>) ?? null,
-    beforeData: (log.beforeData as Record<string, any>) ?? null,
-    afterData: (log.afterData as Record<string, any>) ?? null,
+    metadata: parseJsonField(log.metadata),
+    beforeData: parseJsonField(log.beforeData),
+    afterData: parseJsonField(log.afterData),
     createdAt: log.createdAt,
   }
 }

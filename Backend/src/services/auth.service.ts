@@ -20,14 +20,14 @@ export const formatSafeUser = (user: {
   email: string
   phone: string | null
   avatarUrl?: string | null
-  role: Role
+  role: Role | string
 }): SafeUser => ({
   id: user.id,
   name: user.name,
   email: user.email,
   phone: user.phone,
   avatarUrl: user.avatarUrl ?? null,
-  role: user.role,
+  role: user.role as Role,
 })
 
 export const formatSafeGym = (gym: {
@@ -127,7 +127,7 @@ export const registerGymAndOwner = async (
   const token = generateAuthToken({
     sub: result.user.id,
     gymId: result.gym.id,
-    role: result.user.role,
+    role: result.user.role as Role,
   })
 
   return {
@@ -189,7 +189,7 @@ export const loginUser = async (
   const token = generateAuthToken({
     sub: user.id,
     gymId: user.gymId,
-    role: user.role,
+    role: user.role as Role,
   })
 
   await createAuditLog({

@@ -5,6 +5,7 @@ import { logger } from './utils/logger.util.js'
 import { disconnectDatabase } from './config/database.js'
 import { initScheduler, stopScheduler } from './jobs/scheduler.job.js'
 import { initSocketServer } from './services/socket.service.js'
+import { initAutoBackupScheduler } from './services/backup.service.js'
 
 let server: http.Server | null = null
 
@@ -24,8 +25,9 @@ const startServer = (): void => {
     logger.info(`🌐 Allowed Frontend Origin: ${env.FRONTEND_URL}`)
     logger.info(`⚡ WebSockets: Online and ready`)
 
-    // Start background jobs scheduler
+    // Start background jobs scheduler & auto backups
     initScheduler()
+    initAutoBackupScheduler()
   })
 }
 

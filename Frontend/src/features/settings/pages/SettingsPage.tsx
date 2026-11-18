@@ -24,6 +24,8 @@ import {
   Upload,
   Trash2,
   Check,
+  Key,
+  Database,
 } from 'lucide-react'
 import { gymApi } from '@/features/gym/services/gymApi'
 import type { GymProfile, UpdateGymInput } from '@/features/gym/types/gym.types'
@@ -31,6 +33,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { normalizePhone, EGYPTIAN_PHONE_REGEX } from '@/lib/validation'
 import { FieldError } from '@/components/ui/FieldError'
 import { getMediaUrl } from '@/lib/media'
+import { LicenseSettingsTab } from '../components/LicenseSettingsTab'
+import { BackupSettingsTab } from '../components/BackupSettingsTab'
 
 // Settings Schema
 const settingsFormSchema = z
@@ -112,6 +116,8 @@ type SettingsTabId =
   | 'freeze_policy'
   | 'attendance'
   | 'system'
+  | 'license'
+  | 'backups'
 
 interface SettingsTab {
   id: SettingsTabId
@@ -126,6 +132,8 @@ const SETTINGS_TABS: SettingsTab[] = [
   { id: 'freeze_policy', label: 'سياسة تجميد الاشتراكات', icon: PauseCircle, stepNumber: 3 },
   { id: 'attendance', label: 'إعدادات الحضور', icon: UserCheck, stepNumber: 4 },
   { id: 'system', label: 'إعدادات النظام', icon: ShieldCheck, stepNumber: 5 },
+  { id: 'license', label: 'ترخيص النظام', icon: Key, stepNumber: 6 },
+  { id: 'backups', label: 'النسخ الاحتياطي', icon: Database, stepNumber: 7 },
 ]
 
 export const SettingsPage: React.FC = () => {
@@ -552,6 +560,10 @@ export const SettingsPage: React.FC = () => {
                       'خيارات وضوابط تسجيل حضور وانصراف المشتركين في الصالة الرياضية'}
                     {activeTab === 'system' &&
                       'المعايير المعتمدة للنظام وفق الإصدار الأول للسوق المصري'}
+                    {activeTab === 'license' &&
+                      'إدارة رخصة النظام، كود بصمة الجهاز، باقة الأعضاء، وتحديث التفعيل'}
+                    {activeTab === 'backups' &&
+                      'إدارة واستعادة النسخ الاحتياطية اليومية لقاعدة بيانات النادي المحلية'}
                   </p>
                 </div>
                 <div className="shrink-0 px-3 py-1 rounded-xl bg-zinc-100 text-zinc-600 text-xs font-bold">
@@ -1006,8 +1018,14 @@ export const SettingsPage: React.FC = () => {
                 </div>
               )}
 
+              {/* TAB 6: System License */}
+              {activeTab === 'license' && <LicenseSettingsTab />}
+
+              {/* TAB 7: Database Backups */}
+              {activeTab === 'backups' && <BackupSettingsTab />}
+
               {/* Action Footer Bar */}
-              {canEdit && (
+              {canEdit && activeTab !== 'license' && activeTab !== 'backups' && (
                 <div className="pt-5 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <button
                     type="submit"

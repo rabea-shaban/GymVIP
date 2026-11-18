@@ -36,12 +36,20 @@ export const formatGymProfile = (gym: {
   maxFreezeDays?: number | null
   allowManualCheckout?: boolean | null
 }): GymProfile => {
-  const reminderDays = Array.isArray(gym.subscriptionReminderDays)
-    ? (gym.subscriptionReminderDays as number[])
+  let rawReminderDays = gym.subscriptionReminderDays
+  if (typeof rawReminderDays === 'string') {
+    try { rawReminderDays = JSON.parse(rawReminderDays) } catch { rawReminderDays = null }
+  }
+  const reminderDays = Array.isArray(rawReminderDays)
+    ? (rawReminderDays as number[])
     : DEFAULT_REMINDER_DAYS
 
-  const freezeDurations = Array.isArray(gym.allowedFreezeDurations)
-    ? (gym.allowedFreezeDurations as number[])
+  let rawFreezeDurations = gym.allowedFreezeDurations
+  if (typeof rawFreezeDurations === 'string') {
+    try { rawFreezeDurations = JSON.parse(rawFreezeDurations) } catch { rawFreezeDurations = null }
+  }
+  const freezeDurations = Array.isArray(rawFreezeDurations)
+    ? (rawFreezeDurations as number[])
     : DEFAULT_ALLOWED_FREEZE_DURATIONS
 
   return {
@@ -226,13 +234,13 @@ export const updateGymSettings = async (
         subscriptionReminderEnabled: input.subscriptionReminderEnabled,
       }),
       ...(sortedReminderDays !== undefined && {
-        subscriptionReminderDays: sortedReminderDays,
+        subscriptionReminderDays: JSON.stringify(sortedReminderDays),
       }),
       ...(input.subscriptionFreezeEnabled !== undefined && {
         subscriptionFreezeEnabled: input.subscriptionFreezeEnabled,
       }),
       ...(sortedFreezeDurations !== undefined && {
-        allowedFreezeDurations: sortedFreezeDurations,
+        allowedFreezeDurations: JSON.stringify(sortedFreezeDurations),
       }),
       ...(input.maxFreezeDays !== undefined && {
         maxFreezeDays: input.maxFreezeDays,

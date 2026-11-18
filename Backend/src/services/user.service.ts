@@ -24,7 +24,7 @@ export const formatUserDto = (user: {
   email: string
   phone: string | null
   avatarUrl?: string | null
-  role: Role
+  role: Role | string
   isActive: boolean
   lastLoginAt: Date | null
   createdAt: Date
@@ -36,7 +36,7 @@ export const formatUserDto = (user: {
   email: user.email,
   phone: user.phone,
   avatarUrl: user.avatarUrl ?? null,
-  role: user.role,
+  role: user.role as Role,
   isActive: user.isActive,
   lastLoginAt: user.lastLoginAt,
   createdAt: user.createdAt,

@@ -39,6 +39,20 @@ Backend/uploads/*
 !Backend/uploads/users/
 !Backend/uploads/gyms/
 
+# Master Licensing Private Key
+scripts/keys/private.pem
+*.private.pem
+.machine_id
+scripts/issued_licenses.json
+
+# SQLite Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 # OS and Editor files
 .DS_Store
 Thumbs.db

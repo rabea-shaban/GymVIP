@@ -104,8 +104,8 @@ export const userQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
-export type CreateUserInput = z.infer<typeof createUserSchema>
-export type UpdateUserInput = z.infer<typeof updateUserSchema>
-export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>
-export type ResetUserPasswordInput = z.infer<typeof resetUserPasswordSchema>
-export type UserQueryParams = z.infer<typeof userQuerySchema>
+export type CreateUserInput = z.output<typeof createUserSchema>
+export type UpdateUserInput = z.output<typeof updateUserSchema>
+export type UpdateUserStatusInput = z.output<typeof updateUserStatusSchema>
+export type ResetUserPasswordInput = z.output<typeof resetUserPasswordSchema>
+export type UserQueryParams = z.output<typeof userQuerySchema>

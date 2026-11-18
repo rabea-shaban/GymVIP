@@ -196,3 +196,29 @@ export const showErrorAlert = (title: string, message?: string, errors?: Array<{
     confirmButtonText: 'فهمت',
   })
 }
+
+/**
+ * Standard confirmation dialog
+ */
+export const showConfirmAlert = async (
+  title: string,
+  text: string,
+  confirmButtonText: string = 'تأكيد',
+  cancelButtonText: string = 'إلغاء'
+): Promise<boolean> => {
+  const result = await gymSwal.fire({
+    title,
+    text,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText,
+    cancelButtonText,
+    reverseButtons: true,
+  })
+  return result.isConfirmed
+}
+
+// Convenient Aliases
+export const notifySuccess = showSuccessAlert
+export const notifyError = showErrorAlert
+export const confirmAction = showConfirmAlert

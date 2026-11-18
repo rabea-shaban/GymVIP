@@ -1,0 +1,381 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  RECEPTIONIST
+  TRAINER
+}
+
+/// Gym model representing a fitness club / facility tenant in GymVIP SaaS
+model Gym {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  logo           String?  @db.MediumText
+  currency       String   @default("EGP")
+  timezone       String   @default("Africa/Cairo")
+  isActive       Boolean  @default(true)
+  setupCompleted Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Feature 15: Gym Settings & Business Preferences
+  subscriptionReminderEnabled Boolean  @default(true)
+  subscriptionReminderDays    Json?
+  subscriptionFreezeEnabled   Boolean  @default(true)
+  allowedFreezeDurations      Json?
+  maxFreezeDays               Int      @default(90)
+  allowManualCheckout         Boolean  @default(true)
+
+  users                User[]
+  members              Member[]
+  membershipPlans      MembershipPlan[]
+  subscriptions        Subscription[]
+  payments             Payment[]
+  attendances          Attendance[]
+  trainers             Trainer[]
+  subscriptionFreezes  SubscriptionFreeze[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+
+  @@index([slug])
+  @@map("gyms")
+}
+
+/// User model representing gym staff members, trainers, managers, and owners
+model User {
+  id           String    @id @default(uuid())
+  gymId        String
+  name         String
+  email        String
+  phone        String?
+  avatarUrl    String?   @db.MediumText
+  passwordHash String
+  role         Role      @default(OWNER)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  gym                   Gym                  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  createdPayments       Payment[]
+  createdFreezes        SubscriptionFreeze[]
+  receivedNotifications Notification[]
+  auditLogs             AuditLog[]
+  trainer               Trainer?
+  cancelledSubscriptions Subscription[]       @relation("SubscriptionCancelledBy")
+
+  @@unique([gymId, email])
+  @@index([gymId])
+  @@index([email])
+  @@map("users")
+}
+
+/// Trainer model representing trainer profile details linked to a User in GymVIP SaaS
+model Trainer {
+  id             String   @id @default(uuid())
+  gymId          String
+  userId         String   @unique
+  specialization String?
+  bio            String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([gymId])
+  @@map("trainers")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+/// SystemHealth model used for database connectivity checks
+model SystemHealth {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  status    String   @default("HEALTHY")
+  checkedAt DateTime @default(now()) @updatedAt
+
+  @@map("system_health")
+}
+
+/// Member model representing gym members / clients in GymVIP SaaS
+model Member {
+  id                    String    @id @default(uuid())
+  gymId                 String
+  memberCode            String
+  name                  String
+  phone                 String
+  email                 String?
+  gender                Gender?
+  dateOfBirth           DateTime?
+  address               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  notes                 String?   @db.Text
+  avatarUrl             String?   @db.MediumText
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  gym           Gym            @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  payments      Payment[]
+  attendances   Attendance[]
+
+  @@unique([gymId, memberCode])
+  @@unique([gymId, phone])
+  @@index([gymId])
+  @@index([gymId, isActive])
+  @@index([gymId, name])
+  @@index([gymId, email])
+  @@map("members")
+}
+
+/// MembershipPlan model representing subscription packages and plans in GymVIP SaaS
+model MembershipPlan {
+  id           String   @id @default(uuid())
+  gymId        String
+  name         String
+  description  String?  @db.Text
+  durationDays Int
+  price        Decimal  @db.Decimal(10, 2)
+  currency     String   @default("EGP")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gym           Gym            @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@unique([gymId, name])
+  @@index([gymId])
+  @@index([gymId, isActive])
+  @@index([gymId, name])
+  @@map("membership_plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  FROZEN
+  EXPIRED
+  CANCELLED
+}
+
+/// Subscription model representing purchased membership periods in GymVIP SaaS
+model Subscription {
+  id           String             @id @default(uuid())
+  gymId        String
+  memberId     String
+  planId       String
+
+  planName     String
+  planPrice    Decimal            @db.Decimal(10, 2)
+  durationDays Int
+  currency     String             @default("EGP")
+
+  startDate    DateTime
+  endDate      DateTime
+
+  status       SubscriptionStatus @default(ACTIVE)
+
+  notes        String?            @db.Text
+
+  // Feature 16: Subscription Cancellation & Controlled Adjustments
+  cancelledAt        DateTime?
+  cancellationReason String?
+  cancellationNotes  String?              @db.Text
+  cancelledByUserId  String?
+
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  gym             Gym                  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member          Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan            MembershipPlan       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  cancelledByUser User?                @relation("SubscriptionCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  payments        Payment[]
+  attendances     Attendance[]
+  freezes         SubscriptionFreeze[]
+
+  @@index([gymId])
+  @@index([memberId])
+  @@index([planId])
+  @@index([gymId, status])
+  @@index([gymId, startDate])
+  @@index([gymId, endDate])
+  @@index([cancelledByUserId])
+  @@map("subscriptions")
+}
+
+enum PaymentMethod {
+  CASH
+  WALLET
+}
+
+enum WalletProvider {
+  VODAFONE_CASH
+  ORANGE_CASH
+  ETISALAT_CASH
+  WE
+  INSTAPAY
+  OTHER
+}
+
+/// Payment model representing financial transactions in GymVIP SaaS
+model Payment {
+  id                   String          @id @default(uuid())
+  gymId                String
+  subscriptionId       String
+  memberId             String
+  amount               Decimal         @db.Decimal(10, 2)
+  currency             String          @default("EGP")
+  method               PaymentMethod
+  walletProvider       WalletProvider?
+  transactionReference String?
+  notes                String?         @db.Text
+  createdByUserId      String
+  createdAt            DateTime        @default(now())
+
+  gym           Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  member        Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([gymId])
+  @@index([subscriptionId])
+  @@index([memberId])
+  @@index([createdByUserId])
+  @@index([gymId, method])
+  @@index([gymId, createdAt])
+  @@index([transactionReference])
+  @@map("payments")
+}
+
+/// Attendance model representing member gym visits in GymVIP SaaS
+model Attendance {
+  id              String    @id @default(uuid())
+  gymId           String
+  memberId        String
+  subscriptionId  String
+  checkInAt       DateTime
+  checkOutAt      DateTime?
+  durationMinutes Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  gym          Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member       Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([gymId])
+  @@index([memberId])
+  @@index([subscriptionId])
+  @@index([checkInAt])
+  @@index([checkOutAt])
+  @@index([gymId, memberId])
+  @@index([gymId, checkInAt])
+  @@map("attendances")
+}
+
+/// SubscriptionFreeze model representing temporary pause/freeze periods on subscriptions in GymVIP SaaS
+model SubscriptionFreeze {
+  id              String   @id @default(uuid())
+  gymId           String
+  subscriptionId  String
+  startDate       DateTime
+  endDate         DateTime
+  days            Int
+  reason          String?  @db.Text
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  gym           Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([gymId])
+  @@index([subscriptionId])
+  @@index([createdByUserId])
+  @@index([createdAt])
+  @@map("subscription_freezes")
+}
+
+enum NotificationType {
+  SUBSCRIPTION_EXPIRING
+  SUBSCRIPTION_EXPIRED
+  SUBSCRIPTION_RENEWED
+  SUBSCRIPTION_FROZEN
+  PAYMENT_RECEIVED
+}
+
+/// Notification model representing in-app alerts and notifications in GymVIP SaaS
+model Notification {
+  id               String           @id @default(uuid())
+  gymId            String
+  recipientUserId  String
+  type             NotificationType
+  title            String
+  message          String           @db.Text
+  entityType       String?
+  entityId         String?
+  isRead           Boolean          @default(false)
+  readAt           DateTime?
+  deduplicationKey String?
+  createdAt        DateTime         @default(now())
+
+  gym           Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  recipientUser User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientUserId, deduplicationKey])
+  @@index([gymId])
+  @@index([recipientUserId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+/// AuditLog model representing immutable activity trail for compliance and operations in GymVIP
+model AuditLog {
+  id          String   @id @default(uuid())
+  gymId       String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  description String   @db.Text
+  metadata    Json?
+  beforeData  Json?
+  afterData   Json?
+  createdAt   DateTime @default(now())
+
+  gym       Gym   @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([gymId, createdAt])
+  @@index([gymId, actorUserId, createdAt])
+  @@index([gymId, action, createdAt])
+  @@index([gymId, entityType, entityId])
+  @@map("audit_logs")
+}
+

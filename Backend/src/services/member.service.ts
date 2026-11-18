@@ -1,6 +1,6 @@
 import { prisma } from '../config/database.js'
 import { AppError } from '../utils/appError.util.js'
-import type { Member, Prisma } from '@prisma/client'
+import type { Member, Prisma, Gender } from '@prisma/client'
 import type {
   MemberDto,
   MemberListResult,
@@ -13,6 +13,7 @@ import type {
 } from '../validators/member.validator.js'
 import { createAuditLog } from './audit.service.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../types/audit.types.js'
+import { assertMemberCreationAllowed } from './license.service.js'
 import { emitGymEvent, REALTIME_EVENTS } from './socket.service.js'
 import { saveBase64Image, deleteStoredImage } from '../utils/fileStorage.util.js'
 
@@ -27,7 +28,7 @@ export function formatMemberDto(member: Member): MemberDto {
     name: member.name,
     phone: member.phone,
     email: member.email ?? null,
-    gender: member.gender ?? null,
+    gender: (member.gender as Gender) ?? null,
     dateOfBirth: member.dateOfBirth ? member.dateOfBirth.toISOString().split('T')[0] ?? null : null,
     address: member.address ?? null,
     emergencyContactName: member.emergencyContactName ?? null,
@@ -74,6 +75,9 @@ export async function createMember(
   input: CreateMemberInput,
   actorUserId?: string
 ): Promise<MemberDto> {
+  // 0. Enforce License Limits on Member Count
+  await assertMemberCreationAllowed(gymId)
+
   // 1. Check for duplicate phone in same gym
   const existingPhone = await prisma.member.findUnique({
     where: {
