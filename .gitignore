@@ -33,11 +33,12 @@ npm-cache/
 **/npm-cache/
 
 # User Uploads
-Backend/uploads/*
-!Backend/uploads/.gitkeep
-!Backend/uploads/members/
-!Backend/uploads/users/
-!Backend/uploads/gyms/
+Backend/uploads/members/*
+!Backend/uploads/members/.gitkeep
+Backend/uploads/users/*
+!Backend/uploads/users/.gitkeep
+Backend/uploads/gyms/*
+!Backend/uploads/gyms/.gitkeep
 
 # Master Licensing Private Key
 scripts/keys/private.pem
