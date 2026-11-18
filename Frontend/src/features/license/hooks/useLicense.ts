@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getLicenseStatus, activateLicense, type LicenseStatusDto } from '../services/licenseApi'
-import { notifySuccess, notifyError } from '../../../lib/sweetAlert'
+import { showLicenseActivatedAlert, notifyError } from '../../../lib/sweetAlert'
 
 export const LICENSE_QUERY_KEY = ['systemLicense']
 
@@ -17,10 +17,16 @@ export const useLicense = () => {
 
   const activateMutation = useMutation({
     mutationFn: (key: string) => activateLicense(key),
-    onSuccess: (data) => {
-      notifySuccess('تم تفعيل النظام بنجاح!', `أهلاً بك في GymVIP! باقة (${data.tier || 'PRO'}) مفعلة حتى ${data.expiresAt ? new Date(data.expiresAt).toLocaleDateString('ar-EG') : ''}`)
+    onSuccess: async (data) => {
       queryClient.setQueryData(LICENSE_QUERY_KEY, data)
       queryClient.invalidateQueries()
+      await showLicenseActivatedAlert({
+        gymName: data.gymName,
+        tier: data.tier,
+        expiresAt: data.expiresAt,
+        maxMembers: data.maxMembers,
+        daysRemaining: data.daysRemaining,
+      })
     },
     onError: (err: any) => {
       const msg = err.response?.data?.message || err.message || 'فشل في تفعيل كود الترخيص'

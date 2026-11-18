@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   ShieldAlert,
   Key,
@@ -9,6 +9,9 @@ import {
   Sparkles,
   AlertTriangle,
   X,
+  ClipboardPaste,
+  RotateCcw,
+  CheckCircle2,
 } from 'lucide-react'
 import { useLicense } from '../hooks/useLicense'
 import { notifySuccess } from '../../../lib/sweetAlert'
@@ -27,6 +30,52 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
   const { license, activate, isActivating } = useLicense()
   const [licenseKeyInput, setLicenseKeyInput] = useState('')
   const [copied, setCopied] = useState(false)
+  const [pasteSuccess, setPasteSuccess] = useState(false)
+
+  // Clean raw key: strip accidental markdown quotes/backticks/spaces
+  const cleanKey = (val: string) => {
+    return val.trim().replace(/^[`"']+|[`"']+$/g, '').trim()
+  }
+
+  // Live Validation
+  const validation = useMemo(() => {
+    const trimmed = cleanKey(licenseKeyInput)
+    if (!trimmed) {
+      return {
+        isValid: false,
+        message: 'الصيغة المعتمدة: يبدأ بـ GVLIC- متبوعاً بكود البيانات والتوقيع الرقمي',
+        type: 'neutral' as const,
+      }
+    }
+    if (!trimmed.startsWith('GVLIC-')) {
+      return {
+        isValid: false,
+        message: 'تنبيه: كود التفعيل يجب أن يبدأ بـ GVLIC-',
+        type: 'error' as const,
+      }
+    }
+    const token = trimmed.slice(6)
+    const dotIndex = token.indexOf('.')
+    if (dotIndex === -1 || dotIndex === 0 || dotIndex === token.length - 1) {
+      return {
+        isValid: false,
+        message: 'تنبيه: الكود ناقص (يجب أن يحتوي على نقطة فاصلة بين البيانات والتوقيع)',
+        type: 'error' as const,
+      }
+    }
+    if (trimmed.length < 80) {
+      return {
+        isValid: false,
+        message: 'تنبيه: طول الكود قصير جداً، تأكد من نسخه بالكامل',
+        type: 'error' as const,
+      }
+    }
+    return {
+      isValid: true,
+      message: 'صيغة الكود مكتملة ومطابقة للمواصفات ✓',
+      type: 'success' as const,
+    }
+  }, [licenseKeyInput])
 
   if (!isOpen || !license) return null
 
@@ -44,15 +93,30 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
     }
   }
 
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        setLicenseKeyInput(cleanKey(text))
+        setPasteSuccess(true)
+        setTimeout(() => setPasteSuccess(false), 2000)
+      }
+    } catch {
+      // Fallback if browser permission is blocked
+    }
+  }
+
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!licenseKeyInput.trim()) return
+    const sanitized = cleanKey(licenseKeyInput)
+    if (!sanitized) return
+
     try {
-      await activate(licenseKeyInput.trim())
+      await activate(sanitized)
       setLicenseKeyInput('')
       if (onClose) onClose()
     } catch {
-      // Error handled by mutation hook
+      // Error handled by mutation hook with notifyError
     }
   }
 
@@ -118,7 +182,7 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
               <button
                 type="button"
                 onClick={handleCopyMachineId}
-                className="text-xs inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium px-2 py-1 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
+                className="text-xs inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium px-2 py-1 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors cursor-pointer"
               >
                 {copied ? (
                   <>
@@ -133,7 +197,7 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
                 )}
               </button>
             </div>
-            <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-center font-mono font-bold text-slate-800 dark:text-slate-100 tracking-wider text-sm select-all">
+            <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-center font-mono font-bold text-slate-800 dark:text-slate-100 tracking-wider text-sm select-all shadow-inner">
               {machineId}
             </div>
           </div>
@@ -154,36 +218,93 @@ export const LicenseLockModal: React.FC<LicenseLockModalProps> = ({
           {/* Activation Form */}
           <form onSubmit={handleActivate} className="mt-6 space-y-4">
             <div>
-              <label
-                htmlFor="licenseKey"
-                className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
-              >
-                أدخل كود التفعيل المستلم:
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="licenseKey"
+                  className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+                >
+                  أدخل كود التفعيل المستلم:
+                </label>
+                <div className="flex items-center gap-2">
+                  {licenseKeyInput && (
+                    <button
+                      type="button"
+                      onClick={() => setLicenseKeyInput('')}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      مسح
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handlePasteFromClipboard}
+                    className="text-[11px] text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    {pasteSuccess ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-500" />
+                        تم اللصق
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardPaste className="w-3 h-3" />
+                        لصق من الحافظة
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               <textarea
                 id="licenseKey"
                 rows={3}
                 value={licenseKeyInput}
-                onChange={(e) => setLicenseKeyInput(e.target.value)}
+                onChange={(e) => setLicenseKeyInput(cleanKey(e.target.value))}
                 placeholder="GVLIC-eyJsaWNlbnNl..."
                 required
-                className="w-full text-xs font-mono px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all resize-none"
+                className={`w-full text-xs font-mono px-3.5 py-3 rounded-2xl border bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none transition-all resize-none shadow-sm ${
+                  validation.type === 'success'
+                    ? 'border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/30'
+                    : validation.type === 'error'
+                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-500/30'
+                    : 'border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary-500/30'
+                }`}
               />
+
+              {/* Live Validation Feedback Pill */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                {validation.type === 'success' ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {validation.message}
+                  </span>
+                ) : validation.type === 'error' ? (
+                  <span className="text-rose-500 dark:text-rose-400 font-medium inline-flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {validation.message}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500">
+                    {validation.message}
+                  </span>
+                )}
+              </div>
             </div>
 
             <button
               type="submit"
-              disabled={isActivating || !licenseKeyInput.trim()}
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-semibold text-sm shadow-lg shadow-primary-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              disabled={isActivating || !validation.isValid}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-primary-600 via-primary-500 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold text-sm shadow-xl shadow-primary-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {isActivating ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  جاري التحقق من كود التفعيل...
+                  جاري فك التشفير والتحقق من التوقيع الرقمي...
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 text-amber-300" />
                   تفعيل وتشغيل النظام الآن
                 </>
               )}

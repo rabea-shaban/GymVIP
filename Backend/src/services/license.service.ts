@@ -129,8 +129,11 @@ export async function activateSystemLicense(rawKey: string): Promise<LicenseStat
     throw AppError.badRequest('كود التفعيل مطلوب')
   }
 
+  // Sanitize key from potential markdown backticks, quotes, or accidental surrounding whitespace
+  const sanitizedKey = rawKey.trim().replace(/^[`"']+|[`"']+$/g, '').trim()
+
   const latestDbActivity = await getLatestDatabaseActivity()
-  const verification: LicenseVerificationResult = verifyLicenseKey(rawKey, latestDbActivity)
+  const verification: LicenseVerificationResult = verifyLicenseKey(sanitizedKey, latestDbActivity)
 
   if (!verification.valid || !verification.payload) {
     throw AppError.badRequest(verification.message)
@@ -146,7 +149,7 @@ export async function activateSystemLicense(rawKey: string): Promise<LicenseStat
     // Insert new license record
     await tx.systemLicense.create({
       data: {
-        licenseKey: rawKey.trim(),
+        licenseKey: sanitizedKey,
         machineId: p.machineId,
         gymName: p.gymName,
         tier: p.tier,

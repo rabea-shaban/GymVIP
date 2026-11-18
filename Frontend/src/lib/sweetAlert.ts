@@ -222,3 +222,75 @@ export const showConfirmAlert = async (
 export const notifySuccess = showSuccessAlert
 export const notifyError = showErrorAlert
 export const confirmAction = showConfirmAlert
+
+export interface LicenseActivatedAlertProps {
+  gymName?: string | null
+  tier?: string | null
+  expiresAt?: string | null
+  maxMembers?: number | null
+  daysRemaining?: number
+}
+
+/**
+ * Luxury celebration modal upon successful license activation
+ */
+export const showLicenseActivatedAlert = async ({
+  gymName,
+  tier = 'PRO',
+  expiresAt,
+  maxMembers = 500,
+  daysRemaining,
+}: LicenseActivatedAlertProps): Promise<void> => {
+  const formattedDate = expiresAt
+    ? new Date(expiresAt).toLocaleDateString('ar-EG', { dateStyle: 'long' })
+    : 'غير محدد'
+
+  await gymSwal.fire({
+    title: 'تهانينا! تم تفعيل رخصة GymVIP بنجاح',
+    html: `
+      <div style="direction: rtl; text-align: center; padding-top: 8px;">
+        <!-- Shield Icon with Glow -->
+        <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+          <div style="width: 78px; height: 78px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); border: 2.5px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 34px; box-shadow: 0 0 35px rgba(16, 185, 129, 0.4);">
+            👑
+          </div>
+        </div>
+
+        <!-- Gym Name -->
+        <h3 style="font-size: 22px; font-weight: 900; color: #ffffff; margin: 0 0 6px 0; font-family: 'Cairo', sans-serif;">
+          ${gymName || 'نظام GymVIP'}
+        </h3>
+        <p style="font-size: 13px; color: #a1a1aa; margin: 0 0 16px 0;">النسخة مرخصة ومقفلة على هذا الجهاز بعقد رسمي</p>
+
+        <!-- Tier Badge -->
+        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.35); color: #F3D372; padding: 6px 20px; border-radius: 9999px; font-weight: 800; font-size: 13px; margin-bottom: 16px;">
+          <span>الباقة المفعلة:</span>
+          <span style="font-family: monospace; font-size: 14px; letter-spacing: 0.5px;">${tier}</span>
+        </div>
+
+        <!-- Details Card -->
+        <div style="background: rgba(24, 24, 27, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 16px 20px; font-size: 13px; color: #e4e4e7; text-align: right; backdrop-filter: blur(10px);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="color: #a1a1aa; font-weight: 600;">تاريخ الانتهاء:</span>
+            <span style="font-weight: 800; color: #ffffff;">${formattedDate}</span>
+          </div>
+          ${
+            daysRemaining !== undefined
+              ? `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <span style="color: #a1a1aa; font-weight: 600;">المدة المتبقية:</span>
+                  <span style="font-weight: 800; color: #10b981;">${daysRemaining} يوم</span>
+                </div>`
+              : ''
+          }
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1);">
+            <span style="color: #a1a1aa; font-weight: 600;">سعة الأعضاء المسموحة:</span>
+            <span style="font-weight: 900; color: #F3D372; font-size: 14px;">${maxMembers} عضو</span>
+          </div>
+        </div>
+      </div>
+    `,
+    icon: 'success',
+    iconColor: '#10b981',
+    confirmButtonText: 'ابدأ العمل بالنظام الآن ✨',
+  })
+}
