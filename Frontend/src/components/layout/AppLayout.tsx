@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { LicenseWarningBanner } from '@/features/license/components/LicenseWarningBanner'
 import { cn } from '@/lib/utils'
 
 export const AppLayout: React.FC = () => {
@@ -39,6 +40,9 @@ export const AppLayout: React.FC = () => {
           isSidebarCollapsed ? 'lg:mr-20' : 'lg:mr-64'
         )}
       >
+        {/* Dynamic License Expiry Warning Banner (Contained inside main shell) */}
+        <LicenseWarningBanner />
+
         {/* Top Header */}
         <Header onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
 

@@ -1,7 +1,6 @@
 import React from 'react'
 import { useLicense } from '../hooks/useLicense'
 import { LicenseLockModal } from './LicenseLockModal'
-import { LicenseWarningBanner } from './LicenseWarningBanner'
 
 interface LicenseGuardProps {
   children: React.ReactNode
@@ -19,7 +18,6 @@ export const LicenseGuard: React.FC<LicenseGuardProps> = ({ children }) => {
 
   return (
     <>
-      <LicenseWarningBanner />
       {children}
       {isBlocked && <LicenseLockModal isOpen={true} />}
     </>
